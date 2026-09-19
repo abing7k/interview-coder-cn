@@ -13,20 +13,18 @@ import {
   CommandList
 } from '@/components/ui/command'
 
-const defaultModels = [
-  {
-    value: 'deepseek-flash',
-    label: 'deepseek-flash'
-  },
-  { value: 'Qwen/Qwen3-VL-32B-Instruct', label: 'Qwen/Qwen3-VL-32B-Instruct' },
-  { value: 'Qwen/Qwen3-VL-8B-Thinking', label: 'Qwen/Qwen3-VL-8B-Thinking' },
-  { value: 'zai-org/GLM-4.5V', label: 'zai-org/GLM-4.5V' },
-  { value: 'gpt-5.6-luna', label: 'gpt-5.6-luna' },
-  { value: 'gpt-5.6-terra', label: 'gpt-5.6-terra' },
-  { value: 'gpt-5.6-sol', label: 'gpt-5.6-sol' }
+/** Preset endpoints, mirroring how SelectModel ships a few popular models */
+const defaultBaseURLs = [
+  { value: 'https://api.siliconflow.cn/v1', label: 'https://api.siliconflow.cn/v1' },
+  { value: 'https://api.deepseek.com', label: 'https://api.deepseek.com' }
 ]
 
-export function SelectModel({
+/**
+ * API Base URL picker: same combobox behaviour as SelectModel — pick a preset,
+ * or type a URL to create and remember your own. Clearing the selection falls
+ * back to the OpenAI default the main process assumes for an empty value.
+ */
+export function SelectBaseURL({
   value,
   onChange,
   disabled,
@@ -39,43 +37,43 @@ export function SelectModel({
 }) {
   const [open, setOpen] = useState(false)
   const [searchValue, setSearchValue] = useState('')
-  const { customModels, updateSetting } = useSettingsStore()
+  const { customBaseURLs, updateSetting } = useSettingsStore()
 
-  const models = useMemo(() => {
-    const customItems = customModels.map((m) => ({ value: m, label: m, isCustom: true }))
-    const defaultItems = defaultModels.map((m) => ({ ...m, isCustom: false }))
+  const urls = useMemo(() => {
+    const customItems = customBaseURLs.map((u) => ({ value: u, label: u, isCustom: true }))
+    const defaultItems = defaultBaseURLs.map((u) => ({ ...u, isCustom: false }))
     return [...customItems, ...defaultItems]
-  }, [customModels])
+  }, [customBaseURLs])
 
-  const addCustomModel = (newModel: string) => {
-    const newValue = newModel.trim()
+  const addCustomBaseURL = (newURL: string) => {
+    const newValue = newURL.trim()
     if (!newValue) return
-    const exists = models.some((m) => m.value === newValue)
+    const exists = urls.some((u) => u.value === newValue)
     if (exists) {
       onChange?.(newValue)
       setOpen(false)
       setSearchValue('')
       return
     }
-    updateSetting('customModels', [...customModels, newValue])
+    updateSetting('customBaseURLs', [...customBaseURLs, newValue])
     onChange?.(newValue)
     setSearchValue('')
     setOpen(false)
   }
 
-  const deleteCustomModel = (val: string) => {
+  const deleteCustomBaseURL = (val: string) => {
     updateSetting(
-      'customModels',
-      customModels.filter((m) => m !== val)
+      'customBaseURLs',
+      customBaseURLs.filter((u) => u !== val)
     )
     if (value === val) {
       onChange?.('')
     }
   }
 
-  const filtered = models.filter((m) => m.label.toLowerCase().includes(searchValue.toLowerCase()))
+  const filtered = urls.filter((u) => u.label.toLowerCase().includes(searchValue.toLowerCase()))
   const showCreate =
-    searchValue && !filtered.some((m) => m.label.toLowerCase() === searchValue.toLowerCase())
+    searchValue && !filtered.some((u) => u.label.toLowerCase() === searchValue.toLowerCase())
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -88,7 +86,7 @@ export function SelectModel({
           className={cn('w-60 justify-between overflow-hidden', className)}
         >
           <span className="truncate">
-            {value ? (models.find((m) => m.value === value)?.label ?? value) : '选择模型...'}
+            {value ? (urls.find((u) => u.value === value)?.label ?? value) : '选择 API 地址...'}
           </span>
           <ChevronsUpDown className="opacity-50" />
         </Button>
@@ -104,10 +102,10 @@ export function SelectModel({
           <CommandList>
             <CommandEmpty>未找到结果</CommandEmpty>
             <CommandGroup>
-              {filtered.map((m) => (
-                <div key={m.value} className="group flex">
+              {filtered.map((u) => (
+                <div key={u.value} className="group flex">
                   <CommandItem
-                    value={m.value}
+                    value={u.value}
                     onSelect={(current) => {
                       onChange?.(current === value ? '' : current)
                       setSearchValue('')
@@ -115,16 +113,16 @@ export function SelectModel({
                     }}
                     className="flex-1 overflow-hidden"
                   >
-                    <span className="truncate">{m.label}</span>
+                    <span className="truncate">{u.label}</span>
                     <Check
-                      className={cn('ml-auto', value === m.value ? 'opacity-100' : 'opacity-0')}
+                      className={cn('ml-auto', value === u.value ? 'opacity-100' : 'opacity-0')}
                     />
                   </CommandItem>
-                  {m.isCustom && (
+                  {u.isCustom && (
                     <div className="hidden group-hover:flex">
                       <button
                         className="text-gray-400 hover:text-red-500 cursor-pointer"
-                        onClick={() => deleteCustomModel(m.value)}
+                        onClick={() => deleteCustomBaseURL(u.value)}
                       >
                         <X className="h-6 w-6" />
                       </button>
@@ -135,7 +133,7 @@ export function SelectModel({
               {showCreate && (
                 <CommandItem
                   value={`create-${searchValue}`}
-                  onSelect={() => addCustomModel(searchValue)}
+                  onSelect={() => addCustomBaseURL(searchValue)}
                   className="!text-blue-600"
                 >
                   <Plus className="mr-2 h-4 w-4" />

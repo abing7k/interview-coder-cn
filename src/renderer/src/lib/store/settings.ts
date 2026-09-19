@@ -4,6 +4,9 @@ import codingPrompt from './prompts/coding.md?raw'
 import englishExamPrompt from './prompts/english-exam.md?raw'
 import aptitudeTestPrompt from './prompts/aptitude-test.md?raw'
 import generalQaPrompt from './prompts/general-qa.md?raw'
+import { DEFAULT_THEME, type Theme } from '../theme'
+
+export type { Theme }
 
 export interface PromptScene {
   id: string
@@ -65,8 +68,11 @@ export const OPACITY_MAX = 1
 export const OPACITY_STEP = 0.05
 
 interface Settings {
-  // theme: 'light' | 'dark'an
+  /** Window colour scheme; `light` is a white background with dark text */
+  theme: Theme
   apiBaseURL: string
+  /** API Base URL entries the user created from the picker, kept as a shortcut list */
+  customBaseURLs: string[]
   apiKey: string
   model: string
   customModels: string[]
@@ -108,7 +114,9 @@ interface SettingsStore extends Settings {
 }
 
 const defaultSettings: Settings = {
+  theme: DEFAULT_THEME,
   apiBaseURL: '',
+  customBaseURLs: [],
   apiKey: '',
   model: '',
   customModels: [],

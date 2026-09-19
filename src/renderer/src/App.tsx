@@ -8,12 +8,20 @@ import { OverlayToolbar } from '@/coder/OverlayToolbar'
 import { useSettingsStore } from '@/lib/store/settings'
 import { useShortcutsStore } from '@/lib/store/shortcuts'
 import { getCloneableFields } from '@/lib/utils'
+import { applyTheme } from '@/lib/theme'
 import { WindowResizeHandles } from '@/components/WindowResizeHandles'
 
 export default function App() {
   const [initialized, setInitialized] = useState(false)
   const settingsStore = useSettingsStore()
   const { shortcuts } = useShortcutsStore()
+  const theme = useSettingsStore((state) => state.theme)
+
+  // Paint the window before syncing with main, so the first frame already uses
+  // the persisted theme; the toolbar window gets the live value pushed to it.
+  useEffect(() => {
+    applyTheme(theme)
+  }, [theme])
 
   useEffect(() => {
     window.api.getAppSettings().then((settings) => {

@@ -17,8 +17,11 @@ ipcMain.handle('updateAppSettings', (_event, _settings) => {
   if ('opacity' in _settings) {
     setToolbarOpacity(settings.opacity)
   }
-  if ('toolbarHoverDelay' in _settings) {
-    syncToolbarSettings(settings.toolbarHoverDelay)
+  if ('toolbarHoverDelay' in _settings || 'theme' in _settings) {
+    syncToolbarSettings({
+      hoverDelay: settings.toolbarHoverDelay,
+      theme: settings.theme
+    })
   }
 })
 
@@ -44,6 +47,8 @@ ipcMain.handle('selectScreenshotDir', async () => {
 })
 
 export const settings = {
+  /** Window colour scheme, kept in sync with the renderer; see renderer lib/theme.ts */
+  theme: 'dark' as 'dark' | 'light',
   apiBaseURL: process.env.API_BASE_URL || '',
   apiKey: process.env.API_KEY || '',
   model: process.env.MODEL || '',

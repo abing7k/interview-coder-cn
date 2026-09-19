@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { TOOLBAR_ACTIONS, type ToolbarActionName } from '@/lib/toolbar-actions'
 import type { LucideIcon } from 'lucide-react'
 import { WindowResizeHandles } from '@/components/WindowResizeHandles'
+import { applyTheme } from '@/lib/theme'
 
 /** Mirrors `.overlay-toolbar` in main.css: `p-2` around `size-7` buttons with `gap-0.5` */
 const BAR_PADDING = 8
@@ -19,13 +20,16 @@ export function OverlayToolbar() {
   const barRef = useRef<HTMLDivElement>(null)
   const visibleCount = useVisibleActionCount(barRef)
 
-  // This window has its own settings store copy, so main pushes the live value
+  // This window has its own settings store copy, so main pushes the live value.
+  // The theme is left to App.tsx on load — this window shares localStorage with
+  // the main window, and main's copy may still hold its startup default here.
   useEffect(() => {
     window.api.getAppSettings().then((settings) => {
       setHoverDelay(settings.toolbarHoverDelay || 0)
     })
-    window.api.onSyncToolbarSettings(({ hoverDelay }) => {
+    window.api.onSyncToolbarSettings(({ hoverDelay, theme }) => {
       setHoverDelay(hoverDelay || 0)
+      applyTheme(theme)
     })
     return () => {
       window.api.removeSyncToolbarSettingsListener()

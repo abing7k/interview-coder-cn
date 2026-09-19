@@ -10,7 +10,10 @@
 }
 
 #app-header {
-  @apply h-9 bg-gray-700/80 text-white;
+  @apply h-9;
+  background: var(--app-header-bg);
+  color: var(--app-header-fg);
+  border-bottom: 1px solid var(--app-header-border);
   -webkit-app-region: drag;
   .actions {
     -webkit-app-region: no-drag;
@@ -22,7 +25,9 @@
 }
 
 #app-content {
-  @apply h-[calc(100vh-36px)] overflow-y-auto bg-gray-500;
+  @apply h-[calc(100vh-36px)] overflow-y-auto;
+  background: var(--app-surface-bg);
+  color: var(--app-surface-fg);
 }
 
 .transcription-scroll {
@@ -32,7 +37,7 @@
   scrollbar-color: transparent transparent;
 }
 .transcription-scroll:hover {
-  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+  scrollbar-color: var(--app-scrollbar-thumb) transparent;
 }
 .transcription-scroll::-webkit-scrollbar {
   width: 4px;
@@ -42,21 +47,33 @@
   border-radius: 2px;
 }
 .transcription-scroll:hover::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.3);
+  background: var(--app-scrollbar-thumb);
 }
 
 .overlay-toolbar {
-  @apply flex h-11 items-center gap-0.5 rounded-md bg-gray-700/80 p-2 text-white;
+  @apply flex h-11 items-center gap-0.5 rounded-md p-2;
+  background: var(--app-panel-bg);
+  color: var(--app-panel-fg);
+  /* Drawn inside the box: a real border would steal 2px from the window height
+     the button-fit measurement in OverlayToolbar is calibrated against */
+  outline: 1px solid var(--app-panel-border);
+  outline-offset: -1px;
+  box-shadow: var(--app-panel-shadow);
   -webkit-app-region: no-drag;
 }
 
 .overlay-toolbar button {
-  @apply relative size-7 shrink-0 cursor-default overflow-hidden hover:bg-white/15 hover:text-white;
+  @apply relative size-7 shrink-0 cursor-default overflow-hidden;
+}
+.overlay-toolbar button:hover {
+  background: var(--app-hover-bg);
+  color: var(--app-hover-fg);
 }
 
 /* Fills up over the dwell time, so hover-to-trigger is visible before it fires */
 .dwell-progress {
-  @apply pointer-events-none absolute inset-x-0 bottom-0 h-0.5 origin-left bg-white/80;
+  @apply pointer-events-none absolute inset-x-0 bottom-0 h-0.5 origin-left;
+  background: var(--app-dwell-fg);
   animation: dwell-fill linear forwards;
 }
 

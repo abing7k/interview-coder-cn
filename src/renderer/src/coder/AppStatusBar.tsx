@@ -54,7 +54,7 @@ export function AppStatusBar() {
   const hasActiveConversation = screenshotData && solutionChunks.length > 0
 
   return (
-    <div className="absolute bottom-0 flex items-center justify-between w-full text-blue-100 bg-gray-600/10 px-4 pb-1">
+    <div className="absolute bottom-0 flex items-center justify-between w-full text-app-status-fg bg-app-status px-4 pb-1">
       <div>
         {isReceivingSolution ? (
           <div className="flex items-center space-x-2">

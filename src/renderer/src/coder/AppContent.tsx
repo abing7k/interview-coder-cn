@@ -192,9 +192,9 @@ function Screenshots({
   if (display === 'none') return null
 
   if (display === 'count') {
-    // The content area sits on bg-gray-500, so the card reads light-on-dark like the prose
+    // Themed so the card reads correctly on both the dark and the light surface
     return (
-      <div className="mb-4 inline-flex items-center gap-1.5 rounded-lg border border-white/30 bg-white/10 px-2.5 py-1 text-sm text-gray-100 select-none">
+      <div className="mb-4 inline-flex items-center gap-1.5 rounded-lg border border-app-chip-border bg-app-chip px-2.5 py-1 text-sm text-app-chip-fg select-none">
         <Images className="h-4 w-4" />
         {total} 张截图
       </div>
@@ -208,7 +208,7 @@ function Screenshots({
           key={index}
           src={`data:image/png;base64,${data}`}
           alt={`Screenshot ${index + 1}`}
-          className="w-40 h-auto flex-shrink-0 border border-gray-600 rounded-lg shadow-lg hover:shadow-xl transition-shadow"
+          className="w-40 h-auto flex-shrink-0 border border-app-border rounded-lg shadow-lg hover:shadow-xl transition-shadow"
           title={`第 ${index + 1} 张截图`}
         />
       ))}
@@ -219,7 +219,7 @@ function Screenshots({
 function ShortcutTip() {
   const { shortcuts } = useShortcutsStore()
   return (
-    <div className="flex items-center justify-center h-full text-xl text-gray-400 select-none">
+    <div className="flex items-center justify-center h-full text-xl text-app-muted-fg select-none">
       请按下快捷键
       <ShortcutRenderer
         shortcut={shortcuts.takeScreenshot.key}

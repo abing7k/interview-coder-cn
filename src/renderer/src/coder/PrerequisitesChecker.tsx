@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router'
 import { Eye, EyeOff } from 'lucide-react'
 import { useSettingsStore } from '@/lib/store/settings'
 import { Button } from '@/components/ui/button'
+import { SelectBaseURL } from '@/settings/SelectBaseURL'
 
 export function PrerequisitesChecker() {
   const navigate = useNavigate()
@@ -59,12 +60,10 @@ export function PrerequisitesChecker() {
                 (配置硅基流动或其他代理服务商的 API Base URL 地址)
               </span>
             </label>
-            <input
-              type="text"
+            <SelectBaseURL
+              className="w-full"
               value={inputApiBaseURL}
-              onChange={(e) => setInputApiBaseURL(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="https://api.openai.com/v1"
+              onChange={setInputApiBaseURL}
             />
           </div>
 

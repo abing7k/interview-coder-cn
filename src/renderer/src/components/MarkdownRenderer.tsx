@@ -2,6 +2,8 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import 'highlight.js/styles/github-dark.css'
+// Overrides the palette above under the light app theme (see main.css `--app-*`)
+import '@/assets/hljs-github-light.css'
 
 // Ref https://github.com/tailwindlabs/tailwindcss-typography to fine-tune the markdown style
 export default function MarkdownRenderer({ children }: { children: string }) {

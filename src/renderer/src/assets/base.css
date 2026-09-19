@@ -36,6 +36,82 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /*
+   * App chrome colours. Unlike the shadcn variables above these are theme
+   * dependent: `dark` (the default) keeps the original translucent grey window,
+   * `light` turns it into a white window with dark text so the tool blends into
+   * a white exam page. See [data-theme='light'] below.
+   */
+  --app-header-bg: oklch(0.373 0.034 259.733 / 0.8);
+  --app-header-fg: oklch(1 0 0);
+  --app-header-border: transparent;
+  --app-surface-bg: oklch(0.551 0.027 264.364);
+  --app-surface-fg: oklch(0.145 0 0);
+  --app-panel-bg: oklch(0.373 0.034 259.733 / 0.8);
+  --app-panel-fg: oklch(0.872 0.01 258.338);
+  --app-panel-border: transparent;
+  --app-panel-shadow: none;
+  --app-muted-fg: oklch(0.707 0.022 261.325);
+  --app-border: oklch(0.446 0.03 256.802);
+  --app-hover-bg: oklch(1 0 0 / 0.15);
+  --app-hover-fg: oklch(1 0 0);
+  --app-dwell-fg: oklch(1 0 0 / 0.8);
+  --app-scrollbar-thumb: oklch(1 0 0 / 0.3);
+  --app-chip-bg: oklch(1 0 0 / 0.1);
+  --app-chip-border: oklch(1 0 0 / 0.3);
+  --app-chip-fg: oklch(0.967 0.003 264.542);
+  --app-status-bg: oklch(0.446 0.03 256.802 / 0.1);
+  --app-status-fg: oklch(0.932 0.032 255.585);
+}
+
+/* Light theme: white background, black text — matches a white exam page */
+[data-theme='light'] {
+  --app-header-bg: oklch(0.985 0 0 / 0.95);
+  --app-header-fg: oklch(0.21 0.006 285.885);
+  --app-header-border: oklch(0.922 0 0);
+  --app-surface-bg: oklch(1 0 0);
+  --app-surface-fg: oklch(0.21 0.006 285.885);
+  --app-panel-bg: oklch(0.952 0.004 286.32 / 0.96);
+  --app-panel-fg: oklch(0.37 0.013 285.805);
+  --app-panel-border: oklch(0.871 0.006 286.286);
+  --app-panel-shadow: 0 1px 4px oklch(0 0 0 / 0.15);
+  --app-muted-fg: oklch(0.552 0.016 285.938);
+  --app-border: oklch(0.871 0.006 286.286);
+  --app-hover-bg: oklch(0 0 0 / 0.08);
+  --app-hover-fg: oklch(0.21 0.006 285.885);
+  --app-dwell-fg: oklch(0.21 0.006 285.885 / 0.8);
+  --app-scrollbar-thumb: oklch(0 0 0 / 0.3);
+  --app-chip-bg: oklch(0 0 0 / 0.04);
+  --app-chip-border: oklch(0 0 0 / 0.18);
+  --app-chip-fg: oklch(0.32 0.01 285);
+  --app-status-bg: oklch(0 0 0 / 0.04);
+  --app-status-fg: oklch(0.32 0.01 285);
+}
+
+/* Markdown: undo `prose-invert` and hand the typography plugin a light palette */
+[data-theme='light'] .prose.prose-invert {
+  --tw-prose-body: oklch(0.25 0 0);
+  --tw-prose-headings: oklch(0.15 0 0);
+  --tw-prose-lead: oklch(0.4 0 0);
+  --tw-prose-links: oklch(0.45 0.16 258);
+  --tw-prose-bold: oklch(0.15 0 0);
+  --tw-prose-counters: oklch(0.45 0 0);
+  --tw-prose-bullets: oklch(0.7 0 0);
+  --tw-prose-hr: oklch(0.92 0 0);
+  --tw-prose-quotes: oklch(0.2 0 0);
+  --tw-prose-quote-borders: oklch(0.9 0 0);
+  --tw-prose-captions: oklch(0.5 0 0);
+  --tw-prose-code: oklch(0.2 0 0);
+  --tw-prose-pre-code: oklch(0.2 0 0);
+  --tw-prose-pre-bg: oklch(0.968 0.001 286.375);
+  --tw-prose-th-borders: oklch(0.85 0 0);
+  --tw-prose-td-borders: oklch(0.92 0 0);
+}
+
+/* Border the code block so a near-white panel still reads as a block */
+[data-theme='light'] .prose pre {
+  border: 1px solid oklch(0.9 0 0);
 }
 
 @theme inline {
@@ -75,4 +151,18 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* App chrome, theme dependent (see the --app-* declarations above) */
+  --color-app-header: var(--app-header-bg);
+  --color-app-header-fg: var(--app-header-fg);
+  --color-app-surface: var(--app-surface-bg);
+  --color-app-panel: var(--app-panel-bg);
+  --color-app-panel-fg: var(--app-panel-fg);
+  --color-app-muted-fg: var(--app-muted-fg);
+  --color-app-border: var(--app-border);
+  --color-app-chip: var(--app-chip-bg);
+  --color-app-chip-border: var(--app-chip-border);
+  --color-app-chip-fg: var(--app-chip-fg);
+  --color-app-status: var(--app-status-bg);
+  --color-app-status-fg: var(--app-status-fg);
 }
