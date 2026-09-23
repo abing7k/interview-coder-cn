@@ -4,6 +4,7 @@ import { Eye, EyeOff } from 'lucide-react'
 import { useSettingsStore } from '@/lib/store/settings'
 import { Button } from '@/components/ui/button'
 import { SelectBaseURL } from '@/settings/SelectBaseURL'
+import { changeApiBaseURL } from '@/lib/model-switch'
 
 export function PrerequisitesChecker() {
   const navigate = useNavigate()
@@ -17,7 +18,8 @@ export function PrerequisitesChecker() {
       updateSetting('apiKey', inputApiKey.trim())
     }
     if (inputApiBaseURL.trim()) {
-      updateSetting('apiBaseURL', inputApiBaseURL.trim())
+      // Also picks a model in this platform's spelling, so first use works out of the box
+      changeApiBaseURL(inputApiBaseURL.trim())
     }
   }
 

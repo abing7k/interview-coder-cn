@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { ChevronsUpDown, Check, Plus, X } from 'lucide-react'
 import { useSettingsStore } from '@/lib/store/settings'
+import { PROVIDERS, findProvider } from '@/lib/providers'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   Command,
@@ -13,12 +14,11 @@ import {
   CommandList
 } from '@/components/ui/command'
 
-/** Preset endpoints, mirroring how SelectModel ships a few popular models */
-const defaultBaseURLs = [
-  { value: 'https://api.deepseek.com', label: 'https://api.deepseek.com' },
-  { value: 'https://openrouter.ai/api/v1', label: 'https://openrouter.ai/api/v1' },
-  { value: 'https://api.siliconflow.cn/v1', label: 'https://api.siliconflow.cn/v1' }
-]
+/** Preset endpoints; OpenAI needs no entry, it is what an empty URL means */
+const defaultBaseURLs = PROVIDERS.filter((p) => p.id !== 'openai').map((p) => ({
+  value: p.baseURL,
+  label: p.baseURL
+}))
 
 /**
  * API Base URL picker: same combobox behaviour as SelectModel — pick a preset,
@@ -79,8 +79,14 @@ export function SelectBaseURL({
   const showCreate =
     searchValue && !filtered.some((u) => u.label.toLowerCase() === searchValue.toLowerCase())
 
+  // A search left over from last time would silently hide most of the list
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next)
+    if (!next) setSearchValue('')
+  }
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -118,6 +124,11 @@ export function SelectBaseURL({
                     className="flex-1 overflow-hidden"
                   >
                     <span className="truncate">{u.label}</span>
+                    {findProvider(u.value) && (
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {findProvider(u.value)!.name}
+                      </span>
+                    )}
                     <Check
                       className={cn('ml-auto', value === u.value ? 'opacity-100' : 'opacity-0')}
                     />

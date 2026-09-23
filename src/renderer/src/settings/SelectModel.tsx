@@ -1,8 +1,17 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { ChevronsUpDown, Check, Plus, X } from 'lucide-react'
+import { ChevronsUpDown, Check, Plus, X, LoaderCircle, RotateCw } from 'lucide-react'
 import { useSettingsStore } from '@/lib/store/settings'
+import {
+  PROVIDERS,
+  cjkSpacing,
+  findProvider,
+  getProviderModels,
+  normalizeBaseURL,
+  type PlatformModel
+} from '@/lib/providers'
+import type { PlatformModelsState } from '@/lib/platform-models'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   Command,
@@ -13,72 +22,103 @@ import {
   CommandList
 } from '@/components/ui/command'
 
-const defaultModels = [
-  {
-    value: 'deepseek-flash',
-    label: 'deepseek-flash'
-  },
-  { value: 'Qwen/Qwen3-VL-32B-Instruct', label: 'Qwen/Qwen3-VL-32B-Instruct' },
-  { value: 'Qwen/Qwen3-VL-8B-Thinking', label: 'Qwen/Qwen3-VL-8B-Thinking' },
-  { value: 'zai-org/GLM-4.5V', label: 'zai-org/GLM-4.5V' },
-  { value: 'gpt-5.6-luna', label: 'gpt-5.6-luna' },
-  { value: 'gpt-5.6-terra', label: 'gpt-5.6-terra' },
-  { value: 'gpt-5.6-sol', label: 'gpt-5.6-sol' }
-]
+interface ModelOption {
+  id: string
+  isCustom?: boolean
+  /** Muted tag after the ID, e.g. why the entry may not work */
+  note?: string
+}
 
+/**
+ * Model picker whose list follows the API Base URL: the recommended models in
+ * that platform's own spelling, the user's custom models for it, and the full
+ * list the platform reports. For an unrecognised platform every known
+ * spelling is listed for reference.
+ */
 export function SelectModel({
   value,
   onChange,
+  baseURL,
+  platformModels,
   disabled,
   className
 }: {
   value?: string
   onChange?: (value: string) => void
+  baseURL: string
+  platformModels: PlatformModelsState & { reload: () => void }
   disabled?: boolean
   className?: string
 }) {
   const [open, setOpen] = useState(false)
   const [searchValue, setSearchValue] = useState('')
-  const { customModels, updateSetting } = useSettingsStore()
+  const { customModels, customModelsByBaseURL, addCustomModel, removeCustomModel } =
+    useSettingsStore()
 
-  const models = useMemo(() => {
-    const customItems = customModels.map((m) => ({ value: m, label: m, isCustom: true }))
-    const defaultItems = defaultModels.map((m) => ({ ...m, isCustom: false }))
-    return [...customItems, ...defaultItems]
-  }, [customModels])
+  const provider = findProvider(baseURL)
+  const platform = platformModels.status === 'ready' ? platformModels.models : undefined
 
-  const addCustomModel = (newModel: string) => {
+  const groups = useMemo(() => {
+    const listed = platform && new Set(platform.map((m) => m.id))
+    const presetGroups = (provider ? [provider] : PROVIDERS).map((p) => ({
+      heading: cjkSpacing(provider ? `${p.name}推荐` : `${p.name}写法`),
+      options: getProviderModels(p).map(
+        (id): ModelOption => ({
+          id,
+          // Only meaningful against the platform the URL actually points at
+          note: provider && listed && !listed.has(id) ? '平台未列出' : undefined
+        })
+      )
+    }))
+    const presetIds = new Set(presetGroups.flatMap((g) => g.options.map((o) => o.id)))
+
+    const ownCustom = customModelsByBaseURL[normalizeBaseURL(baseURL)] ?? []
+    const custom = [...new Set([...ownCustom, ...customModels])]
+      .filter((id) => !presetIds.has(id))
+      .map((id): ModelOption => ({ id, isCustom: true }))
+    const customGroup = { heading: '自定义', options: custom }
+
+    const platformGroup = platform && buildPlatformGroup(platform, presetIds, custom)
+    return provider
+      ? [customGroup, ...presetGroups, ...(platformGroup ? [platformGroup] : [])]
+      : [customGroup, ...(platformGroup ? [platformGroup] : []), ...presetGroups]
+  }, [provider, platform, baseURL, customModels, customModelsByBaseURL])
+
+  const allOptions = groups.flatMap((g) => g.options)
+  const search = searchValue.trim().toLowerCase()
+  const matches = (o: ModelOption) => o.id.toLowerCase().includes(search)
+  const showCreate = !!search && !allOptions.some((o) => o.id.toLowerCase() === search)
+
+  const select = (id: string) => {
+    onChange?.(id === value ? '' : id)
+    setSearchValue('')
+    setOpen(false)
+  }
+
+  const createCustomModel = (newModel: string) => {
     const newValue = newModel.trim()
     if (!newValue) return
-    const exists = models.some((m) => m.value === newValue)
-    if (exists) {
-      onChange?.(newValue)
-      setOpen(false)
-      setSearchValue('')
-      return
-    }
-    updateSetting('customModels', [...customModels, newValue])
+    addCustomModel(baseURL, newValue)
     onChange?.(newValue)
     setSearchValue('')
     setOpen(false)
   }
 
-  const deleteCustomModel = (val: string) => {
-    updateSetting(
-      'customModels',
-      customModels.filter((m) => m !== val)
-    )
-    if (value === val) {
+  const deleteCustomModel = (id: string) => {
+    removeCustomModel(baseURL, id)
+    if (value === id) {
       onChange?.('')
     }
   }
 
-  const filtered = models.filter((m) => m.label.toLowerCase().includes(searchValue.toLowerCase()))
-  const showCreate =
-    searchValue && !filtered.some((m) => m.label.toLowerCase() === searchValue.toLowerCase())
+  // A search left over from last time would silently hide most of the list
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next)
+    if (!next) setSearchValue('')
+  }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -87,14 +127,13 @@ export function SelectModel({
           disabled={disabled}
           className={cn('w-60 justify-between overflow-hidden', className)}
         >
-          <span className="truncate">
-            {value ? (models.find((m) => m.value === value)?.label ?? value) : '选择模型...'}
-          </span>
+          <span className="truncate">{value || '选择模型...'}</span>
           <ChevronsUpDown className="opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto min-w-60 max-w-[26rem] p-0">
-        <Command>
+        {/* Filtering is done here so groups keep their order instead of cmdk's ranking */}
+        <Command shouldFilter={false}>
           <CommandInput
             placeholder="输入以搜索或创建..."
             className="h-9"
@@ -103,49 +142,110 @@ export function SelectModel({
           />
           <CommandList>
             <CommandEmpty>未找到结果</CommandEmpty>
-            <CommandGroup>
-              {filtered.map((m) => (
-                <div key={m.value} className="group flex">
-                  <CommandItem
-                    value={m.value}
-                    onSelect={(current) => {
-                      onChange?.(current === value ? '' : current)
-                      setSearchValue('')
-                      setOpen(false)
-                    }}
-                    className="flex-1 overflow-hidden"
-                  >
-                    <span className="truncate">{m.label}</span>
-                    <Check
-                      className={cn('ml-auto', value === m.value ? 'opacity-100' : 'opacity-0')}
-                    />
-                  </CommandItem>
-                  {m.isCustom && (
-                    <div className="hidden group-hover:flex">
-                      <button
-                        className="text-gray-400 hover:text-red-500 cursor-pointer"
-                        onClick={() => deleteCustomModel(m.value)}
+            {groups.map((group) => {
+              const options = group.options.filter(matches)
+              if (options.length === 0) return null
+              return (
+                <CommandGroup key={group.heading} heading={group.heading}>
+                  {options.map((o) => (
+                    <div key={o.id} className="group flex">
+                      <CommandItem
+                        value={o.id}
+                        onSelect={() => select(o.id)}
+                        className="flex-1 overflow-hidden"
                       >
-                        <X className="h-6 w-6" />
-                      </button>
+                        <span className="truncate">{o.id}</span>
+                        {o.note && (
+                          <span className="shrink-0 text-xs text-muted-foreground">{o.note}</span>
+                        )}
+                        <Check
+                          className={cn('ml-auto', value === o.id ? 'opacity-100' : 'opacity-0')}
+                        />
+                      </CommandItem>
+                      {o.isCustom && (
+                        <div className="hidden group-hover:flex">
+                          <button
+                            className="text-gray-400 hover:text-red-500 cursor-pointer"
+                            onClick={() => deleteCustomModel(o.id)}
+                          >
+                            <X className="h-6 w-6" />
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              ))}
-              {showCreate && (
+                  ))}
+                </CommandGroup>
+              )
+            })}
+            {!search && (
+              <PlatformStatus state={platformModels} needsKey={!provider?.publicModelList} />
+            )}
+            {showCreate && (
+              <CommandGroup>
                 <CommandItem
                   value={`create-${searchValue}`}
-                  onSelect={() => addCustomModel(searchValue)}
+                  onSelect={() => createCustomModel(searchValue)}
                   className="!text-blue-600"
                 >
                   <Plus className="mr-2 h-4 w-4" />
-                  创建 “{searchValue}”
+                  创建 “{searchValue.trim()}”
                 </CommandItem>
-              )}
-            </CommandGroup>
+              </CommandGroup>
+            )}
           </CommandList>
         </Command>
       </PopoverContent>
     </Popover>
   )
+}
+
+/** The platform's own models not already listed above; only image-capable ones when known */
+function buildPlatformGroup(
+  platform: PlatformModel[],
+  presetIds: Set<string>,
+  custom: ModelOption[]
+) {
+  const shown = new Set([...presetIds, ...custom.map((o) => o.id)])
+  const knowsVision = platform.some((m) => m.vision !== undefined)
+  const options = platform
+    .filter((m) => !shown.has(m.id) && (!knowsVision || m.vision))
+    .map((m): ModelOption => ({ id: m.id }))
+    .sort((a, b) => a.id.localeCompare(b.id))
+  return {
+    heading: `${knowsVision ? '平台上支持图片的模型' : '平台上的全部模型'}（${options.length}）`,
+    options
+  }
+}
+
+/** Where the platform's model list is at, while it isn't ready to be shown as a group */
+function PlatformStatus({
+  state,
+  needsKey
+}: {
+  state: PlatformModelsState & { reload: () => void }
+  needsKey: boolean
+}) {
+  let item: ReactNode = null
+  if (state.status === 'idle' && needsKey) {
+    item = (
+      <CommandItem disabled value="platform-idle" className="text-xs">
+        填写 API Key 后可加载平台的完整模型列表
+      </CommandItem>
+    )
+  } else if (state.status === 'loading') {
+    item = (
+      <CommandItem disabled value="platform-loading" className="text-xs">
+        <LoaderCircle className="h-4 w-4 animate-spin" />
+        正在获取平台的模型列表…
+      </CommandItem>
+    )
+  } else if (state.status === 'error') {
+    item = (
+      <CommandItem value="platform-retry" onSelect={state.reload} className="text-xs">
+        <RotateCw className="h-4 w-4" />
+        获取失败：{state.error}，点击重试
+      </CommandItem>
+    )
+  }
+  return item && <CommandGroup heading="平台上的全部模型">{item}</CommandGroup>
 }

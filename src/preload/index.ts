@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import type { AppSettings } from '../main/settings'
 import type { AppState } from '../main/state'
+import type { ListModelsOptions, ModelListResult } from '../main/model-list'
 
 // Custom APIs for renderer
 const api = {
@@ -12,6 +13,9 @@ const api = {
   // Update app settings
   updateAppSettings: (settings: Partial<AppSettings>) =>
     ipcRenderer.invoke('updateAppSettings', settings),
+  // Fetch the model IDs an OpenAI-compatible platform serves (its `/models` endpoint)
+  listModels: (baseURL: string, apiKey: string, options?: ListModelsOptions) =>
+    ipcRenderer.invoke('listModels', baseURL, apiKey, options) as Promise<ModelListResult>,
 
   // Resize transparent frameless windows without toggling Electron's native resizable style
   startWindowResize: (direction: 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw') =>

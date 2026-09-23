@@ -36,6 +36,7 @@ src/
 │   ├── toolbar-window.ts    # Overlay toolbar window: bounds/visibility/opacity glued to main window
 │   ├── shortcuts.ts         # Global shortcuts registration + AI streaming orchestration (largest file)
 │   ├── ai.ts                # Vercel AI SDK integration, 3 streaming functions
+│   ├── model-list.ts        # `listModels` IPC: a platform's `/models` list (+ SiliconFlow vision flags scraped from its public model square)
 │   ├── settings.ts          # App settings object + IPC handlers
 │   ├── state.ts             # App state object + IPC handlers
 │   ├── take-screenshot.ts   # desktopCapturer → base64 PNG
@@ -61,7 +62,9 @@ src/
         │   └── PrerequisitesChecker.tsx  # Modal for API key setup
         ├── settings/         # Settings page
         │   ├── index.tsx     # AI config, coding, appearance, shortcuts, privacy
-        │   ├── SelectModel.tsx     # Combobox with custom model input
+        │   ├── ModelField.tsx      # Model row: picker + mismatch warning with one-click fix
+        │   ├── SelectModel.tsx     # Model combobox that follows the API Base URL
+        │   ├── SelectBaseURL.tsx   # API Base URL combobox (presets from lib/providers.ts)
         │   └── CustomShortcuts.tsx # Shortcut key recorder
         ├── help/             # Help page
         │   ├── index.tsx     # Quick start guide, shortcuts, toolbar, FAQ
@@ -82,6 +85,9 @@ src/
         │   │   ├── solution.ts  # Loading state, solution chunks, screenshots, errors
         │   │   └── transcription.ts # Transcription state: isTranscribing, text, error
         │   ├── toolbar-actions.ts # Toolbar button list (action + icon + label), shared with help
+        │   ├── providers.ts  # Known platforms + each one's spelling of the same model
+        │   ├── platform-models.ts # usePlatformModels(): cached `/models` list per URL + key
+        │   ├── model-switch.ts    # changeApiBaseURL(): switch URL, toast the linked model change
         │   ├── utils/
         │   │   ├── index.ts     # cn() helper, getCloneableFields()
         │   │   ├── env.ts       # isMac, platformAlt
@@ -139,6 +145,7 @@ src/
 
 **Renderer → Main (invoke):**
 - `getAppSettings` / `updateAppSettings` — settings CRUD
+- `listModels` — fetch the model list of an OpenAI-compatible platform (runs in main to avoid CORS)
 - `updateAppState` — sync `inCoderPage`, `ignoreMouse`
 - `initShortcuts` / `getShortcuts` / `updateShortcuts` — shortcut management
 - `stopSolutionStream` — abort current AI stream
@@ -162,7 +169,7 @@ src/
 
 | Store | File | Persisted | Key State |
 |-------|------|-----------|-----------|
-| `useSettingsStore` | `lib/store/settings.ts` | Yes (v8) | `apiBaseURL`, `apiKey`, `model`, `customModels`, `scenes` (prompt scenes), `activeSceneId`, `customPrompt` (derived from active scene), `opacity`, `resizable`, `showOverlayToolbar`, `toolbarHoverDelay`, `screenshotDisplay`, `dashscopeApiKey` |
+| `useSettingsStore` | `lib/store/settings.ts` | Yes (v8) | `apiBaseURL`, `apiKey`, `model`, `customModels`, `customModelsByBaseURL`, `modelByBaseURL`, `scenes` (prompt scenes), `activeSceneId`, `customPrompt` (derived from active scene), `opacity`, `resizable`, `showOverlayToolbar`, `toolbarHoverDelay`, `screenshotDisplay`, `dashscopeApiKey` |
 | `useShortcutsStore` | `lib/store/shortcuts.ts` | Yes (v5) | `shortcuts` (action → key mapping with categories) |
 | `useSolutionStore` | `lib/store/solution.ts` | No | `isLoading`, `solutionChunks`, `screenshotData`, `errorMessage` |
 | `useTranscriptionStore` | `lib/store/transcription.ts` | No | `isTranscribing`, `transcriptionText`, `errorMessage` |
@@ -210,6 +217,7 @@ Both windows are created with `resizable: false` — toggling Electron's native 
 - All AI calls go through `src/main/ai.ts` using Vercel AI SDK's `streamText()`
 - Provider: `@ai-sdk/openai` with custom `baseURL` (works with any OpenAI-compatible API)
 - Model fallback: `Qwen/Qwen3-VL-32B-Instruct` for SiliconFlow, `gpt-5-mini` otherwise
+- Model ↔ API Base URL linkage lives in the renderer (`lib/providers.ts`): each platform spells the same model differently (`deepseek-flash` vs `deepseek/deepseek-v4.1-flash`), so the picker lists the selected platform's spelling and `setApiBaseURL()` translates the model on switch (else restores the one last used with that URL, else the platform default). Change the API Base URL through `changeApiBaseURL()`, not `updateSetting`, so the model follows and the user gets an undo toast. Preset models must accept image input
 - System prompts are maintained in the renderer settings store (`PRESET_SCENE_PROMPTS` in `lib/store/settings.ts`) as "prompt scenes"; the active scene's prompt is synced to the main process as `customPrompt`
 - Three streaming functions: `getSolutionStream` (first screenshot), `getFollowUpStream` (follow-up), `getGeneralStream` (multi-screenshot)
 - Conversation history (`conversationMessages`) is maintained in `shortcuts.ts` as `ModelMessage[]`

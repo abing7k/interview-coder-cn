@@ -39,8 +39,9 @@ import {
 } from '@/lib/store/settings'
 import type { Theme } from '@/lib/theme'
 import { isMac } from '@/lib/utils/env'
-import { SelectModel } from './SelectModel'
+import { ModelField } from './ModelField'
 import { SelectBaseURL } from './SelectBaseURL'
+import { changeApiBaseURL } from '@/lib/model-switch'
 import { CustomShortcuts, ResetDefaultShortcuts } from './CustomShortcuts'
 import {
   Select,
@@ -60,7 +61,6 @@ export default function SettingsPage() {
     screenshotDisplay,
     apiBaseURL,
     apiKey,
-    model,
     scenes,
     activeSceneId,
     screenshotAutoSave,
@@ -150,13 +150,10 @@ export default function SettingsPage() {
               <label className="text-sm font-medium">
                 API Base URL
                 <span className="ml-2 text-xs font-light">
-                  如硅基流动为 https://api.siliconflow.cn/v1
+                  可选常用平台，也可输入其他 OpenAI 兼容地址
                 </span>
               </label>
-              <SelectBaseURL
-                value={apiBaseURL}
-                onChange={(val) => updateSetting('apiBaseURL', val)}
-              />
+              <SelectBaseURL value={apiBaseURL} onChange={changeApiBaseURL} />
             </div>
 
             <div className="flex items-center justify-between">
@@ -180,15 +177,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium">
-                Model
-                <span className="ml-2 text-xs font-light">
-                  这里列了几个流行的国内和国外模型，请自行确认你的平台是否支持
-                </span>
-              </label>
-              <SelectModel value={model} onChange={(val) => updateSetting('model', val)} />
-            </div>
+            <ModelField />
           </div>
         </div>
         {/* Transcription Settings */}

@@ -5,6 +5,7 @@ import englishExamPrompt from './prompts/english-exam.md?raw'
 import aptitudeTestPrompt from './prompts/aptitude-test.md?raw'
 import generalQaPrompt from './prompts/general-qa.md?raw'
 import { DEFAULT_THEME, type Theme } from '../theme'
+import { normalizeBaseURL, resolveLinkedModel, type ModelSwitchReason } from '../providers'
 
 export type { Theme }
 
@@ -75,7 +76,12 @@ interface Settings {
   customBaseURLs: string[]
   apiKey: string
   model: string
+  /** Custom models created before they were kept per API Base URL; offered for every URL */
   customModels: string[]
+  /** Custom models the user created, keyed by normalized API Base URL */
+  customModelsByBaseURL: Record<string, string[]>
+  /** Last model used with each normalized API Base URL, restored when switching back */
+  modelByBaseURL: Record<string, string>
   customPrompt: string
 
   scenes: PromptScene[]
@@ -102,8 +108,21 @@ interface Settings {
   audioOutputDeviceId: string
 }
 
+/** A model change made on the user's behalf when the API Base URL changed */
+export interface ModelSwitch {
+  from: string
+  to: string
+  reason: ModelSwitchReason
+}
+
 interface SettingsStore extends Settings {
   updateSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => void
+  /** Change the API Base URL and carry the model over to the new platform's spelling */
+  setApiBaseURL: (url: string) => ModelSwitch | null
+  /** Change the model, remembering it for the current API Base URL */
+  setModel: (model: string) => void
+  addCustomModel: (baseURL: string, model: string) => void
+  removeCustomModel: (baseURL: string, model: string) => void
   /** Step the window opacity within [OPACITY_MIN, OPACITY_MAX] */
   adjustOpacity: (delta: number) => void
   syncSettings: (settings: Partial<Settings>) => void
@@ -120,6 +139,8 @@ const defaultSettings: Settings = {
   apiKey: '',
   model: '',
   customModels: [],
+  customModelsByBaseURL: {},
+  modelByBaseURL: {},
   customPrompt: PRESET_SCENE_PROMPTS[CODING_SCENE_ID],
   scenes: createPresetScenes(),
   activeSceneId: CODING_SCENE_ID,
@@ -147,6 +168,61 @@ export const useSettingsStore = create<SettingsStore>()(
       ...defaultSettings,
       updateSetting: (key, value) => {
         set({ [key]: value })
+      },
+      setApiBaseURL: (url) => {
+        const state = get()
+        const from = normalizeBaseURL(state.apiBaseURL)
+        const to = normalizeBaseURL(url)
+        if (from === to) {
+          set({ apiBaseURL: url })
+          return null
+        }
+        const modelByBaseURL = { ...state.modelByBaseURL }
+        if (state.model) modelByBaseURL[from] = state.model
+        const linked = resolveLinkedModel({
+          model: state.model,
+          baseURL: to,
+          remembered: modelByBaseURL[to],
+          customModels: state.customModelsByBaseURL[to] ?? []
+        })
+        const model = linked?.model ?? state.model
+        if (model) modelByBaseURL[to] = model
+        set({ apiBaseURL: url, model, modelByBaseURL })
+        return linked && linked.model !== state.model
+          ? { from: state.model, to: linked.model, reason: linked.reason }
+          : null
+      },
+      setModel: (model) => {
+        set((state) => {
+          const key = normalizeBaseURL(state.apiBaseURL)
+          const modelByBaseURL = { ...state.modelByBaseURL }
+          if (model) modelByBaseURL[key] = model
+          else delete modelByBaseURL[key]
+          return { model, modelByBaseURL }
+        })
+      },
+      addCustomModel: (baseURL, model) => {
+        set((state) => {
+          const key = normalizeBaseURL(baseURL)
+          const list = state.customModelsByBaseURL[key] ?? []
+          if (list.includes(model) || state.customModels.includes(model)) return {}
+          return {
+            customModelsByBaseURL: { ...state.customModelsByBaseURL, [key]: [...list, model] }
+          }
+        })
+      },
+      removeCustomModel: (baseURL, model) => {
+        set((state) => {
+          const key = normalizeBaseURL(baseURL)
+          const customModelsByBaseURL = { ...state.customModelsByBaseURL }
+          const list = (customModelsByBaseURL[key] ?? []).filter((m) => m !== model)
+          if (list.length > 0) customModelsByBaseURL[key] = list
+          else delete customModelsByBaseURL[key]
+          return {
+            customModels: state.customModels.filter((m) => m !== model),
+            customModelsByBaseURL
+          }
+        })
       },
       adjustOpacity: (delta) => {
         const raw = get().opacity + delta
