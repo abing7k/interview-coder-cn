@@ -15,8 +15,9 @@ import {
 
 /** Preset endpoints, mirroring how SelectModel ships a few popular models */
 const defaultBaseURLs = [
-  { value: 'https://api.siliconflow.cn/v1', label: 'https://api.siliconflow.cn/v1' },
-  { value: 'https://api.deepseek.com', label: 'https://api.deepseek.com' }
+  { value: 'https://api.deepseek.com', label: 'https://api.deepseek.com' },
+  { value: 'https://openrouter.ai/api/v1', label: 'https://openrouter.ai/api/v1' },
+  { value: 'https://api.siliconflow.cn/v1', label: 'https://api.siliconflow.cn/v1' }
 ]
 
 /**
@@ -40,7 +41,10 @@ export function SelectBaseURL({
   const { customBaseURLs, updateSetting } = useSettingsStore()
 
   const urls = useMemo(() => {
-    const customItems = customBaseURLs.map((u) => ({ value: u, label: u, isCustom: true }))
+    // A URL saved as custom before it became a preset would otherwise show up twice
+    const customItems = customBaseURLs
+      .filter((u) => !defaultBaseURLs.some((d) => d.value === u))
+      .map((u) => ({ value: u, label: u, isCustom: true }))
     const defaultItems = defaultBaseURLs.map((u) => ({ ...u, isCustom: false }))
     return [...customItems, ...defaultItems]
   }, [customBaseURLs])
