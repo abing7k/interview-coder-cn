@@ -5,7 +5,11 @@
 # 与官方原版「截屏解题助手」完全隔离，避免同一台机器上互相干扰：
 #   - 应用名不同      截屏解题助手-测试
 #   - Bundle ID 不同  com.abing7k.ictest
+#   - 配置目录不同    interview-coder-cn-test（见下方 PACKAGE_NAME）
 #   - 产物目录独立    release-test/
+#
+# 这些差异全部通过命令行参数传给 electron-builder，不写回任何仓库文件，
+# 因此不会进入上游 PR。
 #
 # 用法：
 #   ./scripts/build-mac-test.sh            # 打包 arm64
@@ -18,14 +22,20 @@ cd "$(dirname "$0")/.."
 APP_NAME='截屏解题助手-测试'
 BUNDLE_ID='com.abing7k.ictest'
 OUT_DIR='release-test'
+# The user-data folder is named after `name` in package.json, not productName.
+# Overriding it here is what keeps this build from sharing localStorage with
+# the official app — the two reading one config file corrupts each other,
+# because this build migrates the schema and the official one cannot read it.
+PACKAGE_NAME='interview-coder-cn-test'
 
 echo "==> 编译渲染层与主进程"
 npx electron-vite build
 
-echo "==> 打包 macOS 应用 名称=$APP_NAME  BundleID=$BUNDLE_ID"
+echo "==> 打包 macOS 应用 名称=$APP_NAME  BundleID=$BUNDLE_ID  配置目录=$PACKAGE_NAME"
 npx electron-builder --mac --arm64 \
   -c.productName="$APP_NAME" \
   -c.appId="$BUNDLE_ID" \
+  -c.extraMetadata.name="$PACKAGE_NAME" \
   -c.directories.output="$OUT_DIR"
 
 APP_PATH="$OUT_DIR/mac-arm64/$APP_NAME.app"
