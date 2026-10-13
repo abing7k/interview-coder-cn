@@ -39,12 +39,61 @@ std::condition_variable g_cv;
 std::atomic<bool> g_running{false};
 std::atomic<bool> g_threadReady{false};
 
-bool matchCombo(const Combo& combo, CGKeyCode key, CGEventFlags flags) {
+// Modifier state tracked from the key events themselves: keyboard drivers
+// (Karabiner etc.) re-post events without their modifier flags, so the
+// event's own flags cannot be trusted on their own
+bool g_cmdDown = false;
+bool g_altDown = false;
+bool g_ctrlDown = false;
+bool g_shiftDown = false;
+
+void updateModifiers(CGKeyCode key, bool down) {
+  switch (key) {
+    case 54:  // kVK_RightCommand
+    case 55:  // kVK_Command
+      g_cmdDown = down;
+      break;
+    case 56:  // kVK_Shift
+    case 60:  // kVK_RightShift
+      g_shiftDown = down;
+      break;
+    case 58:  // kVK_Option
+    case 61:  // kVK_RightOption
+      g_altDown = down;
+      break;
+    case 59:  // kVK_Control
+    case 62:  // kVK_RightControl
+      g_ctrlDown = down;
+      break;
+    default:
+      break;
+  }
+}
+
+bool matchComboByFlags(const Combo& combo, CGKeyCode key, CGEventFlags flags) {
   if (key != combo.keyCode) return false;
   return (!!(flags & kCGEventFlagMaskAlternate) == combo.alt) &&
          (!!(flags & kCGEventFlagMaskShift) == combo.shift) &&
          (!!(flags & kCGEventFlagMaskCommand) == combo.cmd) &&
          (!!(flags & kCGEventFlagMaskControl) == combo.ctrl);
+}
+
+bool matchComboTracked(const Combo& combo, CGKeyCode key) {
+  if (key != combo.keyCode) return false;
+  return g_altDown == combo.alt && g_shiftDown == combo.shift && g_cmdDown == combo.cmd &&
+         g_ctrlDown == combo.ctrl;
+}
+
+// Last resort: the session's live modifier state. Correct even when the
+// modifier keydowns never reached this tap (tap started mid-hold, or the
+// driver's re-posted event lost its flags and our tracked state never saw it)
+bool matchComboGlobal(const Combo& combo, CGKeyCode key) {
+  if (key != combo.keyCode) return false;
+  CGEventFlags fl = CGEventSourceFlagsState(kCGEventSourceStateCombinedSessionState);
+  return (!!(fl & kCGEventFlagMaskAlternate) == combo.alt) &&
+         (!!(fl & kCGEventFlagMaskShift) == combo.shift) &&
+         (!!(fl & kCGEventFlagMaskCommand) == combo.cmd) &&
+         (!!(fl & kCGEventFlagMaskControl) == combo.ctrl);
 }
 
 CGEventRef onEvent(CGEventTapProxy, CGEventType type, CGEventRef event, void*) {
@@ -54,8 +103,12 @@ CGEventRef onEvent(CGEventTapProxy, CGEventType type, CGEventRef event, void*) {
   CGEventFlags flags = CGEventGetFlags(event);
 
   if (type == kCGEventKeyDown) {
+    updateModifiers(key, true);
     for (size_t i = 0; i < g_combos.size(); i++) {
-      if (matchCombo(g_combos[i], key, flags)) {
+      // Any matching path suffices: the event's own flags, the modifiers
+      // tracked from the event stream, or the session's live modifier state
+      if (matchComboByFlags(g_combos[i], key, flags) || matchComboTracked(g_combos[i], key) ||
+          matchComboGlobal(g_combos[i], key)) {
         bool repeat = CGEventGetIntegerValueField(event, kCGKeyboardEventAutorepeat) != 0;
         g_combos[i].pendingUp = true;
         if (!repeat && g_tsfnReady) {
@@ -68,6 +121,7 @@ CGEventRef onEvent(CGEventTapProxy, CGEventType type, CGEventRef event, void*) {
       }
     }
   } else {
+    updateModifiers(key, false);
     // The keyup may arrive with its modifiers already released, so swallow it
     // based on the pending state captured when the matching keydown was eaten
     for (auto& combo : g_combos) {
