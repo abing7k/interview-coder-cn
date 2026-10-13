@@ -123,18 +123,12 @@ CGEventRef onEvent(CGEventTapProxy, CGEventType type, CGEventRef event, void*) {
       type == kCGEventKeyDown ? "DOWN" : "UP", key, (unsigned long long)flags, g_cmdDown,
       g_altDown, g_ctrlDown, g_shiftDown);
 
-  // Hide modifier key events from every app while the hook runs. The system
-  // still stamps their flags onto the combo keys that follow, so Cmd+Z / Cmd+Tab
-  // and friends keep working — only the bare modifier press disappears.
-  const bool isModifier = key == 54 || key == 55 || key == 56 || key == 60 || key == 58 ||
-                          key == 61 || key == 59 || key == 62;
-  if (isModifier) {
-    updateModifiers(key, type == kCGEventKeyDown);
-    dbg("  swallow modifier key=%d", key);
-    return nullptr;
-  }
+  // Note: modifier key events (Cmd/Alt/Shift/Ctrl) never reach this tap on
+  // macOS 27 — they are delivered to apps through a path that bypasses every
+  // event-tap location, so they cannot be swallowed here (see memory notes).
 
   if (type == kCGEventKeyDown) {
+    updateModifiers(key, true);
     for (size_t i = 0; i < g_combos.size(); i++) {
       // Any matching path suffices: the event's own flags, the modifiers
       // tracked from the event stream, or the session's live modifier state
@@ -154,6 +148,7 @@ CGEventRef onEvent(CGEventTapProxy, CGEventType type, CGEventRef event, void*) {
       }
     }
   } else {
+    updateModifiers(key, false);
     // The keyup may arrive with its modifiers already released, so swallow it
     // based on the pending state captured when the matching keydown was eaten
     for (auto& combo : g_combos) {
@@ -229,11 +224,8 @@ Napi::Value Start(const Napi::CallbackInfo& info) {
   }
 
   // Create the tap on this (main) thread so a missing accessibility grant is
-  // reported synchronously: without it the tap exists but delivers no events.
-  // The annotated-session tap (unlike the session tap) receives modifier key
-  // events, which is required to swallow the bare Cmd/Alt/Ctrl/Shift presses.
-  g_tap = CGEventTapCreate(kCGAnnotatedSessionEventTap, kCGHeadInsertEventTap,
-                           kCGEventTapOptionDefault,
+  // reported synchronously: without it the tap exists but delivers no events
+  g_tap = CGEventTapCreate(kCGSessionEventTap, kCGHeadInsertEventTap, kCGEventTapOptionDefault,
                            CGEventMaskBit(kCGEventKeyDown) | CGEventMaskBit(kCGEventKeyUp),
                            onEvent, nullptr);
   if (!g_tap || !CGEventTapIsEnabled(g_tap)) {
