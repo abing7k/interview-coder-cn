@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { isMac, platformAlt } from '../utils/env'
+import { isMac } from '../utils/env'
 
 export type Shortcut = {
   action: string
@@ -35,82 +35,66 @@ function isPersistedShortcutsState(value: unknown): value is PersistedShortcutsS
   return typeof value === 'object' && value !== null && 'shortcuts' in value
 }
 
+/**
+ * Bare function-key bindings: a modifier-free shortcut is the only one a
+ * keyboard monitor cannot attribute to a suspicious combo — macOS delivers
+ * modifier keydowns (Cmd/Alt/Ctrl/Shift) to apps through a path event taps
+ * cannot intercept, so any modifier-based shortcut leaves a visible residue.
+ * F13–F17 need a full-size keyboard or a Karabiner remap; those actions are
+ * also reachable from the overlay toolbar / settings.
+ */
 const defaultShortcuts: Record<string, Omit<Shortcut, 'defaultKey'>> = {
   hideOrShowMainWindow: {
     action: 'hideOrShowMainWindow',
-    key: `${platformAlt}+H`,
+    key: 'F12',
     category: 'Window Management'
   },
   ignoreOrEnableMouse: {
     action: 'ignoreOrEnableMouse',
-    key: `${platformAlt}+M`,
+    key: 'F13',
     category: 'Window Management'
   },
-  increaseOpacity: {
-    action: 'increaseOpacity',
-    key: `${platformAlt}+Shift+Up`,
-    category: 'Window Management'
-  },
-  decreaseOpacity: {
-    action: 'decreaseOpacity',
-    key: `${platformAlt}+Shift+Down`,
-    category: 'Window Management'
-  },
-  takeScreenshot: {
-    action: 'takeScreenshot',
-    key: `${platformAlt}+Enter`,
-    category: 'Screenshot & AI'
-  },
-  appendScreenshot: {
-    action: 'appendScreenshot',
-    key: `${platformAlt}+Shift+Enter`,
-    category: 'Screenshot & AI'
-  },
+  increaseOpacity: { action: 'increaseOpacity', key: 'F6', category: 'Window Management' },
+  decreaseOpacity: { action: 'decreaseOpacity', key: 'F7', category: 'Window Management' },
+  takeScreenshot: { action: 'takeScreenshot', key: 'F8', category: 'Screenshot & AI' },
+  appendScreenshot: { action: 'appendScreenshot', key: 'F1', category: 'Screenshot & AI' },
   stopSolutionStream: {
     action: 'stopSolutionStream',
-    key: `${platformAlt}+.`,
+    key: 'F2',
     category: 'Screenshot & AI'
   },
   previousApiProfile: {
     action: 'previousApiProfile',
-    key: `${platformAlt}+[`,
+    key: 'F3',
     category: 'Screenshot & AI'
   },
-  nextApiProfile: {
-    action: 'nextApiProfile',
-    key: `${platformAlt}+]`,
-    category: 'Screenshot & AI'
-  },
+  nextApiProfile: { action: 'nextApiProfile', key: 'F4', category: 'Screenshot & AI' },
   toggleTranscription: {
     action: 'toggleTranscription',
-    key: `${platformAlt}+T`,
+    key: 'F5',
     category: 'Screenshot & AI'
   },
   clearTranscription: {
     action: 'clearTranscription',
-    key: `${platformAlt}+Shift+T`,
+    key: 'F9',
     category: 'Screenshot & AI'
   },
-  pageUp: { action: 'pageUp', key: 'CommandOrControl+J', category: 'Navigation' },
-  pageDown: { action: 'pageDown', key: 'CommandOrControl+K', category: 'Navigation' },
-  moveMainWindowUp: {
-    action: 'moveMainWindowUp',
-    key: 'CommandOrControl+Up',
-    category: 'Window Movement'
-  },
+  pageUp: { action: 'pageUp', key: 'F10', category: 'Navigation' },
+  pageDown: { action: 'pageDown', key: 'F11', category: 'Navigation' },
+  moveMainWindowUp: { action: 'moveMainWindowUp', key: 'F14', category: 'Window Movement' },
   moveMainWindowDown: {
     action: 'moveMainWindowDown',
-    key: 'CommandOrControl+Down',
+    key: 'F15',
     category: 'Window Movement'
   },
   moveMainWindowLeft: {
     action: 'moveMainWindowLeft',
-    key: 'CommandOrControl+Left',
+    key: 'F16',
     category: 'Window Movement'
   },
   moveMainWindowRight: {
     action: 'moveMainWindowRight',
-    key: 'CommandOrControl+Right',
+    key: 'F17',
     category: 'Window Movement'
   }
 }
@@ -189,6 +173,11 @@ export const useShortcutsStore = create<ShortcutsStore>()(
         const shortcuts = { ...current.shortcuts }
         for (const [action, shortcut] of Object.entries(stored)) {
           if (shortcuts[action]) shortcuts[action] = shortcut
+        }
+        // Keep `defaultKey` pinned to the latest code default, so "reset to
+        // default" always restores the current scheme (e.g. the F-key bindings)
+        for (const [action, shortcut] of Object.entries(shortcuts)) {
+          if (current.shortcuts[action]) shortcut.defaultKey = current.shortcuts[action].key
         }
         // `switchApiProfile` was replaced by previous/nextApiProfile; drop it
         // so a stale binding cannot be recorded, nor linger in localStorage
