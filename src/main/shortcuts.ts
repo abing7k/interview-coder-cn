@@ -753,6 +753,23 @@ function isKeyHookMode(): boolean {
   return settings.keyHookEnabled && isKeyHookAvailable
 }
 
+/**
+ * Extra combos swallowed while hook mode is on, with no action behind them.
+ * Copy/paste/cut are monitored by exam platforms, so they get swallowed too —
+ * note this disables them (keyboard copy/paste) in every app while the mode is on.
+ */
+const EXTRA_SWALLOW_ACCELERATORS = ['CommandOrControl+C', 'CommandOrControl+V', 'CommandOrControl+X']
+
+function combosEqual(a: KeyCombo, b: KeyCombo): boolean {
+  return (
+    a.keyCode === b.keyCode &&
+    a.cmd === b.cmd &&
+    a.alt === b.alt &&
+    a.ctrl === b.ctrl &&
+    a.shift === b.shift
+  )
+}
+
 function registerShortcut(action: string, key: string) {
   if (shortcuts[action]) {
     unregisterShortcut(action)
@@ -816,6 +833,16 @@ function restartKeyHook() {
     shortcut.registeredKeys = registeredKeys
     shortcut.status = registeredKeys.length ? ShortcutStatus.Registered : ShortcutStatus.Failed
   })
+
+  // Swallow-only combos (no action); the empty string keeps index alignment
+  EXTRA_SWALLOW_ACCELERATORS.forEach((accel) => {
+    const combo = parseAccelerator(accel)
+    if (combo && !combos.some((c) => combosEqual(c, combo))) {
+      combos.push(combo)
+      actions.push('')
+    }
+  })
+
   startKeyHook(combos, (index) => {
     const action = actions[index]
     if (action) callbacks[action]?.()
