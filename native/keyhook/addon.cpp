@@ -11,11 +11,28 @@
 
 #include <atomic>
 #include <condition_variable>
+#include <cstdarg>
+#include <cstdio>
+#include <cstdlib>
 #include <mutex>
 #include <thread>
 #include <vector>
 
 namespace {
+
+// --- debug logging, enabled with KEYHOOK_DEBUG=1 (goes to stderr) ---
+static bool g_debug = false;
+
+static void dbg(const char* fmt, ...) {
+  if (!g_debug) return;
+  char buf[256];
+  va_list ap;
+  va_start(ap, fmt);
+  vsnprintf(buf, sizeof(buf), fmt, ap);
+  va_end(ap);
+  fprintf(stderr, "[keyhook] %s\n", buf);
+  fflush(stderr);
+}
 
 struct Combo {
   CGKeyCode keyCode;
@@ -102,6 +119,10 @@ CGEventRef onEvent(CGEventTapProxy, CGEventType type, CGEventRef event, void*) {
   CGKeyCode key = (CGKeyCode)CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode);
   CGEventFlags flags = CGEventGetFlags(event);
 
+  dbg("%s key=%d flags=0x%llx tracked{cmd=%d alt=%d ctrl=%d shift=%d}",
+      type == kCGEventKeyDown ? "DOWN" : "UP", key, (unsigned long long)flags, g_cmdDown,
+      g_altDown, g_ctrlDown, g_shiftDown);
+
   if (type == kCGEventKeyDown) {
     updateModifiers(key, true);
     for (size_t i = 0; i < g_combos.size(); i++) {
@@ -111,6 +132,8 @@ CGEventRef onEvent(CGEventTapProxy, CGEventType type, CGEventRef event, void*) {
           matchComboGlobal(g_combos[i], key)) {
         bool repeat = CGEventGetIntegerValueField(event, kCGKeyboardEventAutorepeat) != 0;
         g_combos[i].pendingUp = true;
+        dbg("  MATCH combo[%zu] keyCode=%d repeat=%d -> swallow", i, g_combos[i].keyCode,
+            repeat ? 1 : 0);
         if (!repeat && g_tsfnReady) {
           size_t index = i;
           g_tsfn.NonBlockingCall([index](Napi::Env env, Napi::Function fn) {
@@ -127,6 +150,7 @@ CGEventRef onEvent(CGEventTapProxy, CGEventType type, CGEventRef event, void*) {
     for (auto& combo : g_combos) {
       if (combo.pendingUp && key == combo.keyCode) {
         combo.pendingUp = false;
+        dbg("  swallow pending keyup key=%d", key);
         return nullptr;
       }
     }
@@ -136,6 +160,7 @@ CGEventRef onEvent(CGEventTapProxy, CGEventType type, CGEventRef event, void*) {
 
 void stopInternal() {
   if (!g_running.exchange(false)) return;
+  dbg("stopInternal: stopping");
 
   if (g_thread.joinable()) {
     std::unique_lock<std::mutex> lock(g_mutex);
@@ -170,6 +195,7 @@ Napi::Value Start(const Napi::CallbackInfo& info) {
     return Napi::Boolean::New(env, false);
   }
 
+  dbg("Start: parsing combos");
   Napi::Array arr = info[0].As<Napi::Array>();
   std::vector<Combo> combos;
   for (uint32_t i = 0; i < arr.Length(); i++) {
@@ -185,8 +211,13 @@ Napi::Value Start(const Napi::CallbackInfo& info) {
     combo.cmd = obj.Get("cmd").As<Napi::Boolean>().Value();
     combo.ctrl = obj.Get("ctrl").As<Napi::Boolean>().Value();
     combos.push_back(combo);
+    dbg("  combo[%u] keyCode=%d cmd=%d alt=%d ctrl=%d shift=%d", (unsigned)(combos.size() - 1),
+        combo.keyCode, combo.cmd, combo.alt, combo.ctrl, combo.shift);
   }
-  if (combos.empty()) return Napi::Boolean::New(env, false);
+  if (combos.empty()) {
+    dbg("Start: no combos, aborting");
+    return Napi::Boolean::New(env, false);
+  }
 
   // Create the tap on this (main) thread so a missing accessibility grant is
   // reported synchronously: without it the tap exists but delivers no events
@@ -236,6 +267,8 @@ Napi::Value IsRunning(const Napi::CallbackInfo& info) {
 }
 
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
+  g_debug = getenv("KEYHOOK_DEBUG") != nullptr;
+  if (g_debug) dbg("debug logging enabled");
   exports.Set("start", Napi::Function::New(env, Start));
   exports.Set("stop", Napi::Function::New(env, Stop));
   exports.Set("isRunning", Napi::Function::New(env, IsRunning));
