@@ -16,6 +16,14 @@ import { getSolutionStream, getFollowUpStream, getGeneralStream } from './ai'
 import { state, setPageChangeHandler } from './state'
 import { settings } from './settings'
 import { getTranscriptionText, clearTranscriptionText } from './transcription'
+import {
+  isKeyHookAvailable,
+  parseAccelerator,
+  setKeyHookModeChangeHandler,
+  startKeyHook,
+  stopKeyHook,
+  type KeyCombo
+} from './keyhook'
 
 /**
  * Extract meaningful error message from API errors
@@ -740,9 +748,26 @@ function getShortcutRegistrationKeys(key: string) {
   return keys
 }
 
+/** Swallow mode is on: shortcuts are intercepted by the key hook instead of globalShortcut */
+function isKeyHookMode(): boolean {
+  return settings.keyHookEnabled && isKeyHookAvailable
+}
+
 function registerShortcut(action: string, key: string) {
   if (shortcuts[action]) {
     unregisterShortcut(action)
+  }
+
+  if (isKeyHookMode()) {
+    // In hook mode the shortcut is collected into the key hook below
+    // (restartKeyHook); record it with a placeholder status for now
+    shortcuts[action] = {
+      action,
+      key,
+      status: ShortcutStatus.Available,
+      registeredKeys: []
+    }
+    return
   }
 
   const keysToRegister = getShortcutRegistrationKeys(key)
@@ -761,6 +786,62 @@ function registerShortcut(action: string, key: string) {
   }
 }
 
+/**
+ * Rebuild the key hook from the current shortcut table. Every combo the
+ * accelerator parser can map is swallowed at the system level; unmappable
+ * ones (media keys etc.) keep a globalShortcut registration without swallowing.
+ */
+function restartKeyHook() {
+  stopKeyHook()
+  const combos: KeyCombo[] = []
+  const actions: string[] = []
+  Object.entries(shortcuts).forEach(([action, shortcut]) => {
+    const combo = parseAccelerator(shortcut.key)
+    if (combo) {
+      combos.push(combo)
+      actions.push(action)
+      shortcut.status = ShortcutStatus.Registered
+      shortcut.registeredKeys = []
+      return
+    }
+
+    // Fallback for keys the parser cannot map
+    const keysToRegister = getShortcutRegistrationKeys(shortcut.key)
+    const registeredKeys: string[] = []
+    keysToRegister.forEach((shortcutKey) => {
+      if (globalShortcut.register(shortcutKey, callbacks[action])) {
+        registeredKeys.push(shortcutKey)
+      }
+    })
+    shortcut.registeredKeys = registeredKeys
+    shortcut.status = registeredKeys.length ? ShortcutStatus.Registered : ShortcutStatus.Failed
+  })
+  startKeyHook(combos, (index) => {
+    const action = actions[index]
+    if (action) callbacks[action]?.()
+  })
+}
+
+/** Re-register every shortcut in whichever mode the settings currently ask for */
+function reapplyAllShortcuts() {
+  globalShortcut.unregisterAll()
+  stopKeyHook()
+  if (isKeyHookMode()) {
+    Object.values(shortcuts).forEach((shortcut) => {
+      shortcut.status = ShortcutStatus.Available
+      shortcut.registeredKeys = []
+    })
+    restartKeyHook()
+    return
+  }
+  Object.entries(shortcuts).forEach(([action, shortcut]) => {
+    registerShortcut(action, shortcut.key)
+  })
+}
+
+// The settings page toggles swallow mode; re-register on every flip
+setKeyHookModeChangeHandler(() => reapplyAllShortcuts())
+
 ipcMain.handle('getShortcuts', () => shortcuts)
 
 ipcMain.handle(
@@ -769,6 +850,7 @@ ipcMain.handle(
     Object.entries(shortcuts).forEach(([action, { key }]) => {
       registerShortcut(action, key)
     })
+    if (isKeyHookMode()) restartKeyHook()
   }
 )
 
@@ -778,6 +860,7 @@ ipcMain.handle('updateShortcuts', (_event, _shortcuts: { action: string; key: st
       registerShortcut(shortcut.action, shortcut.key)
     }
   })
+  if (isKeyHookMode()) restartKeyHook()
 })
 
 ipcMain.handle('stopSolutionStream', () => {

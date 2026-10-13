@@ -1,5 +1,6 @@
 import { app, dialog, ipcMain } from 'electron'
 import { setToolbarOpacity, syncToolbarSettings } from './toolbar-window'
+import { notifyKeyHookModeChange } from './keyhook'
 
 ipcMain.handle('getAppVersion', () => {
   return app.getVersion()
@@ -10,6 +11,7 @@ ipcMain.handle('getAppSettings', () => {
 })
 
 ipcMain.handle('updateAppSettings', (_event, _settings) => {
+  const prevKeyHookEnabled = settings.keyHookEnabled
   Object.assign(settings, _settings)
   if ('hideDockIcon' in _settings) {
     applyDockVisibility(settings.hideDockIcon)
@@ -22,6 +24,13 @@ ipcMain.handle('updateAppSettings', (_event, _settings) => {
       hoverDelay: settings.toolbarHoverDelay,
       theme: settings.theme
     })
+  }
+  // Re-registering shortcuts restarts the key hook, so only do it on a real flip
+  if (
+    typeof _settings.keyHookEnabled === 'boolean' &&
+    _settings.keyHookEnabled !== prevKeyHookEnabled
+  ) {
+    notifyKeyHookModeChange()
   }
 })
 
@@ -86,7 +95,13 @@ export const settings = {
   dashscopeApiKey: '',
   hideDockIcon: false,
   audioInputDeviceId: '',
-  audioOutputDeviceId: ''
+  audioOutputDeviceId: '',
+  /**
+   * Swallow mode: registered shortcuts are intercepted by a system-level key
+   * hook so the focused app (browser exam page) never sees their key events.
+   * The real default lives in the renderer store.
+   */
+  keyHookEnabled: false
 }
 
 export type AppSettings = typeof settings

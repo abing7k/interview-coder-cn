@@ -67,6 +67,11 @@ const api = {
   setIgnoreMouse: (ignore: boolean) =>
     ipcRenderer.invoke('setIgnoreMouse', ignore) as Promise<boolean>,
 
+  // Key-hook (swallow mode) status and the macOS accessibility permission prompt
+  getKeyHookStatus: () => ipcRenderer.invoke('getKeyHookStatus'),
+  requestKeyHookPermission: () =>
+    ipcRenderer.invoke('requestKeyHookPermission') as Promise<boolean>,
+
   // Settings the toolbar window needs, pushed from main (its own store is a separate copy)
   onSyncToolbarSettings: (
     callback: (settings: { hoverDelay: number; theme: 'dark' | 'light' }) => void

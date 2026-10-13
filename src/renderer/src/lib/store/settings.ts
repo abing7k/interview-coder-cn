@@ -152,6 +152,12 @@ interface Settings {
 
   audioInputDeviceId: string
   audioOutputDeviceId: string
+
+  /**
+   * 吞键模式（仅 macOS）：已注册的快捷键组合在系统层被拦截，
+   * 浏览器等前台应用收不到按键事件，避免考试平台检测到「键盘异常操作」
+   */
+  keyHookEnabled: boolean
 }
 
 /** A model change made on the user's behalf when the API Base URL changed */
@@ -237,7 +243,9 @@ const defaultSettings: Settings = {
   hideDockIcon: false,
 
   audioInputDeviceId: '',
-  audioOutputDeviceId: ''
+  audioOutputDeviceId: '',
+
+  keyHookEnabled: false
 }
 
 export const useSettingsStore = create<SettingsStore>()(

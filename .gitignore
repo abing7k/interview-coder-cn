@@ -1,6 +1,7 @@
 node_modules
 out
 dist
+native/keyhook/build
 release-test
 .DS_Store
 .eslintcache

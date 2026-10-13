@@ -30,6 +30,7 @@ import {
   DialogTitle
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 import {
   useSettingsStore,
   PRESET_SCENE_PROMPTS,
@@ -79,6 +80,7 @@ export default function SettingsPage() {
     audioInputDeviceId,
     audioOutputDeviceId,
     hideDockIcon,
+    keyHookEnabled,
     updateSetting,
     updateCredential,
     setActiveScene,
@@ -94,6 +96,10 @@ export default function SettingsPage() {
   const [sceneToDelete, setSceneToDelete] = useState<string | null>(null)
 
   const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([])
+
+  const [keyHookStatus, setKeyHookStatus] = useState<Awaited<
+    ReturnType<typeof window.api.getKeyHookStatus>
+  > | null>(null)
 
   // Mirrors save-code.ts: a blank or unusable name falls back to `Test`
   const baseNamePreview = codeFileBaseName.trim() || 'Test'
@@ -143,6 +149,42 @@ export default function SettingsPage() {
     }
     loadDevices()
   }, [])
+
+  const refreshKeyHookStatus = async () => {
+    setKeyHookStatus(await window.api.getKeyHookStatus())
+  }
+
+  useEffect(() => {
+    if (isMac) {
+      void window.api.getKeyHookStatus().then(setKeyHookStatus)
+    }
+  }, [])
+
+  const handleKeyHookToggle = async (checked: boolean) => {
+    updateSetting('keyHookEnabled', checked)
+    if (!checked) {
+      await refreshKeyHookStatus()
+      return
+    }
+    const status = await window.api.getKeyHookStatus()
+    if (!status.available) {
+      toast.error('原生拦截组件不可用，吞键模式无法生效')
+    } else if (!status.trusted) {
+      const granted = await window.api.requestKeyHookPermission()
+      if (!granted) {
+        toast.error('未获得「辅助功能」权限，按键拦截不会生效')
+      }
+    }
+    await refreshKeyHookStatus()
+  }
+
+  const handleRequestKeyHookPermission = async () => {
+    const granted = await window.api.requestKeyHookPermission()
+    if (!granted) {
+      toast.error('未获得「辅助功能」权限，按键拦截不会生效')
+    }
+    await refreshKeyHookStatus()
+  }
 
   const handleAddScene = () => {
     const name = newSceneName.trim()
@@ -624,6 +666,44 @@ export default function SettingsPage() {
             </div>
             <ResetDefaultShortcuts />
           </h2>
+
+          {isMac && (
+            <div className="flex items-center justify-between mb-4">
+              <label className="text-sm font-medium">
+                吞键模式
+                <span className="ml-2 text-xs font-light">
+                  开启后，所有快捷键组合在系统层被拦截，浏览器和监考页面收不到按键事件，可避免考试平台提示「键盘异常操作」；正常打字不受影响，退出软件后自动恢复
+                </span>
+              </label>
+              <Switch
+                className="scale-y-90"
+                checked={keyHookEnabled}
+                onCheckedChange={(checked) => void handleKeyHookToggle(checked)}
+              />
+            </div>
+          )}
+
+          {isMac && keyHookEnabled && keyHookStatus && (
+            <div className="flex items-center justify-between pl-4 border-l-2 border-gray-400/70 mb-4">
+              <span className="text-xs">
+                {keyHookStatus.available
+                  ? keyHookStatus.trusted
+                    ? '「辅助功能」权限已授权，按键拦截生效中'
+                    : '未授权「辅助功能」权限，按键拦截不会生效'
+                  : '原生拦截组件编译失败，吞键模式不可用（其余功能不受影响）'}
+              </span>
+              {keyHookStatus.available && !keyHookStatus.trusted && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void handleRequestKeyHookPermission()}
+                >
+                  去授权
+                </Button>
+              )}
+            </div>
+          )}
+
           <CustomShortcuts />
         </div>
 

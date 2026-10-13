@@ -34,6 +34,7 @@ import './model-list'
 import { createWindow } from './main-window'
 import { initAutoUpdater } from './auto-updater'
 import { applyDockVisibility } from './settings'
+import { stopKeyHook } from './keyhook'
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
@@ -99,4 +100,10 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+// The key hook dies with the process (the OS drops the event tap), but stop
+// it explicitly on a clean quit so no combo is swallowed after the UI is gone
+app.on('will-quit', () => {
+  stopKeyHook()
 })
