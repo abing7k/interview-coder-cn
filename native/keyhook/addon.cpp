@@ -188,6 +188,15 @@ void stopInternal() {
   g_runLoop = nullptr;
   g_threadReady = false;
   g_combos.clear();
+
+  // Release the thread-safe function so the Node event loop can drain and the
+  // process can actually exit. An unreleased TSFN keeps the loop alive, which
+  // left the app — and therefore the event tap — running after quit. Queued
+  // calls drain safely before the finalizer runs.
+  if (g_tsfnReady) {
+    g_tsfn.Release();
+    g_tsfnReady = false;
+  }
 }
 
 Napi::Value Start(const Napi::CallbackInfo& info) {

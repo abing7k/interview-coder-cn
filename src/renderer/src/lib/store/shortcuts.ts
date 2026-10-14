@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { isMac } from '../utils/env'
+import { isMac, platformAlt } from '../utils/env'
 
 export type Shortcut = {
   action: string
@@ -36,65 +36,56 @@ function isPersistedShortcutsState(value: unknown): value is PersistedShortcutsS
 }
 
 /**
- * Bare function-key bindings: a modifier-free shortcut is the only one a
- * keyboard monitor cannot attribute to a suspicious combo — macOS delivers
- * modifier keydowns (Cmd/Alt/Ctrl/Shift) to apps through a path event taps
- * cannot intercept, so any modifier-based shortcut leaves a visible residue.
- * F13–F17 need a full-size keyboard or a Karabiner remap; those actions are
- * also reachable from the overlay toolbar / settings.
+ * Exam-critical actions are bound to bare F1~F10 — a modifier-free shortcut is
+ * the only one a keyboard monitor cannot attribute to a suspicious combo, since
+ * macOS delivers modifier keydowns (Cmd/Alt/Ctrl/Shift) to apps through a path
+ * event taps cannot intercept. Everything else keeps a modifier-based default
+ * and remains reachable from the overlay toolbar / settings.
  */
 const defaultShortcuts: Record<string, Omit<Shortcut, 'defaultKey'>> = {
+  takeScreenshot: { action: 'takeScreenshot', key: 'F8', category: 'Screenshot & AI' },
+  appendScreenshot: { action: 'appendScreenshot', key: 'F1', category: 'Screenshot & AI' },
+  stopSolutionStream: { action: 'stopSolutionStream', key: 'F2', category: 'Screenshot & AI' },
+  previousApiProfile: { action: 'previousApiProfile', key: 'F3', category: 'Screenshot & AI' },
+  nextApiProfile: { action: 'nextApiProfile', key: 'F4', category: 'Screenshot & AI' },
+  toggleTranscription: { action: 'toggleTranscription', key: 'F5', category: 'Screenshot & AI' },
+  increaseOpacity: { action: 'increaseOpacity', key: 'F6', category: 'Window Management' },
+  decreaseOpacity: { action: 'decreaseOpacity', key: 'F7', category: 'Window Management' },
+  pageUp: { action: 'pageUp', key: 'F9', category: 'Navigation' },
+  pageDown: { action: 'pageDown', key: 'F10', category: 'Navigation' },
+  clearTranscription: {
+    action: 'clearTranscription',
+    key: `${platformAlt}+Shift+T`,
+    category: 'Screenshot & AI'
+  },
   hideOrShowMainWindow: {
     action: 'hideOrShowMainWindow',
-    key: 'F12',
+    key: `${platformAlt}+H`,
     category: 'Window Management'
   },
   ignoreOrEnableMouse: {
     action: 'ignoreOrEnableMouse',
-    key: 'F13',
+    key: `${platformAlt}+M`,
     category: 'Window Management'
   },
-  increaseOpacity: { action: 'increaseOpacity', key: 'F6', category: 'Window Management' },
-  decreaseOpacity: { action: 'decreaseOpacity', key: 'F7', category: 'Window Management' },
-  takeScreenshot: { action: 'takeScreenshot', key: 'F8', category: 'Screenshot & AI' },
-  appendScreenshot: { action: 'appendScreenshot', key: 'F1', category: 'Screenshot & AI' },
-  stopSolutionStream: {
-    action: 'stopSolutionStream',
-    key: 'F2',
-    category: 'Screenshot & AI'
+  moveMainWindowUp: {
+    action: 'moveMainWindowUp',
+    key: 'CommandOrControl+Up',
+    category: 'Window Movement'
   },
-  previousApiProfile: {
-    action: 'previousApiProfile',
-    key: 'F3',
-    category: 'Screenshot & AI'
-  },
-  nextApiProfile: { action: 'nextApiProfile', key: 'F4', category: 'Screenshot & AI' },
-  toggleTranscription: {
-    action: 'toggleTranscription',
-    key: 'F5',
-    category: 'Screenshot & AI'
-  },
-  clearTranscription: {
-    action: 'clearTranscription',
-    key: 'F9',
-    category: 'Screenshot & AI'
-  },
-  pageUp: { action: 'pageUp', key: 'F10', category: 'Navigation' },
-  pageDown: { action: 'pageDown', key: 'F11', category: 'Navigation' },
-  moveMainWindowUp: { action: 'moveMainWindowUp', key: 'F14', category: 'Window Movement' },
   moveMainWindowDown: {
     action: 'moveMainWindowDown',
-    key: 'F15',
+    key: 'CommandOrControl+Down',
     category: 'Window Movement'
   },
   moveMainWindowLeft: {
     action: 'moveMainWindowLeft',
-    key: 'F16',
+    key: 'CommandOrControl+Left',
     category: 'Window Movement'
   },
   moveMainWindowRight: {
     action: 'moveMainWindowRight',
-    key: 'F17',
+    key: 'CommandOrControl+Right',
     category: 'Window Movement'
   }
 }

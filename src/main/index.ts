@@ -33,7 +33,7 @@ import './window-resize'
 import './model-list'
 import { createWindow } from './main-window'
 import { initAutoUpdater } from './auto-updater'
-import { applyDockVisibility } from './settings'
+import { applyDockVisibility, settings } from './settings'
 import { stopKeyHook } from './keyhook'
 
 // This method will be called when Electron has finished
@@ -97,7 +97,14 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   // Unregister all shortcuts when there is no window left
   globalShortcut.unregisterAll()
-  if (process.platform !== 'darwin') {
+  // The key hook must not outlive the window either: on macOS the app keeps
+  // running with no UI, and an active event tap would go on swallowing the
+  // shortcuts with nothing on screen to explain it. Restarted by the renderer's
+  // initShortcuts when a window comes back.
+  stopKeyHook()
+  // With the dock icon hidden the user has no way to find the app again — the
+  // window is the only handle on it, so closing it means quitting.
+  if (process.platform !== 'darwin' || settings.hideDockIcon) {
     app.quit()
   }
 })
