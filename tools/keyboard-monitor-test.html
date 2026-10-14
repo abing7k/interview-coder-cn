@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>监考键盘检测模拟器</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #1a2129;
+    --border: #2a3542;
+    --text: #d8e0e8;
+    --dim: #7d8a99;
+    --warn: #ff5252;
+    --warn-bg: #3d1114;
+    --ok: #4cd964;
+    --alt: #ffb340;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    padding: 24px;
+    min-height: 100vh;
+  }
+  h1 { font-size: 20px; display: flex; align-items: center; gap: 10px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ok); display: inline-block; }
+  .sub { color: var(--dim); font-size: 13px; margin-top: 6px; }
+  .banner {
+    display: none;
+    margin-top: 16px;
+    padding: 14px 18px;
+    background: var(--warn-bg);
+    border: 1px solid var(--warn);
+    border-radius: 8px;
+    color: var(--warn);
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .banner.show { display: flex; justify-content: space-between; align-items: center; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin-top: 16px;
+  }
+  .panel h2 { font-size: 15px; margin-bottom: 10px; }
+  .row { display: flex; flex-wrap: wrap; gap: 24px; }
+  .stat { font-size: 13px; color: var(--dim); }
+  .stat b { display: block; font-size: 22px; color: var(--text); margin-top: 2px; }
+  #log {
+    margin-top: 10px;
+    height: 320px;
+    overflow-y: auto;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.7;
+    border-top: 1px solid var(--border);
+    padding-top: 8px;
+  }
+  .entry { white-space: pre-wrap; word-break: break-all; }
+  .entry .t { color: var(--dim); }
+  .entry.keydown { color: #cfe3ff; }
+  .entry.keyup { color: #5a6b7d; }
+  .entry.repeat { color: #46525e; }
+  .entry.combo { color: var(--alt); }
+  .entry.alarm { color: var(--warn); font-weight: 700; }
+  .entry.blur { color: #b48bf2; }
+  label.chk { font-size: 13px; color: var(--dim); display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  textarea, select, button, input[type=text] {
+    background: #10161c; color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px 10px; font-size: 13px; font-family: inherit;
+  }
+  button { cursor: pointer; }
+  button:hover { border-color: #4a5a6a; }
+  #blacklist { width: 100%; height: 130px; font-family: "SF Mono", Menlo, monospace; resize: vertical; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; }
+  th { color: var(--dim); font-weight: normal; }
+  code { background: #10161c; padding: 1px 5px; border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<h1><span class="dot" id="statusDot"></span>监考键盘检测模拟器</h1>
+<div class="sub">监听本页面的所有键盘事件，模拟考试平台的按键检测逻辑。请用 <b>Chrome</b> 打开本页并保持焦点，然后按软件的快捷键。</div>
+
+<div class="banner" id="banner">
+  <span id="bannerText">⚠ 检测到键盘异常操作，为避免影响评测结果，请规范作答</span>
+  <span id="bannerCount" style="white-space:nowrap">0 次</span>
+</div>
+
+<div class="panel">
+  <h2>📊 统计</h2>
+  <div class="row">
+    <div class="stat"><b id="sTotal">0</b>键盘事件总数</div>
+    <div class="stat"><b id="sKeydown">0</b>按键按下次数</div>
+    <div class="stat"><b id="sRecent">0</b>最近 5 秒事件数</div>
+    <div class="stat" style="color:var(--warn)"><b id="sAlarm">0</b>异常报警次数</div>
+    <div class="stat"><b id="sLast">—</b>距上次事件</div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>🛡 检测规则</h2>
+  <div class="row" style="align-items:center; margin-bottom:10px">
+    <label>检测模式
+      <select id="mode">
+        <option value="basic">基础模式：仅黑名单组合报警</option>
+        <option value="strict">严格模式：任何带 Alt/Ctrl/Cmd 的组合都报警</option>
+      </select>
+    </label>
+    <label class="chk"><input type="checkbox" id="modifierAlone" /> 修饰键单独按下也报警（能测出吞键后的 Alt 残留）</label>
+    <label class="chk"><input type="checkbox" id="frequency" checked /> 频率检测（3 秒内 3 次异常 → 密集报警）</label>
+    <label class="chk"><input type="checkbox" id="blurWatch" /> 切屏检测（窗口失焦即报警）</label>
+  </div>
+  <label style="font-size:13px; color:var(--dim)">黑名单组合（每行一个，如 <code>Alt+Enter</code>）：</label>
+  <textarea id="blacklist">Cmd+]
+Cmd+[
+Alt+H
+Alt+M
+Alt+T
+Alt+Shift+T
+Alt+.
+Ctrl+[
+Ctrl+]
+Alt+Shift+Up
+Alt+Shift+Down
+Cmd+J
+Cmd+K
+Cmd+Up
+Cmd+Down
+Cmd+Left
+Cmd+Right
+Cmd+C
+Cmd+V
+Cmd+X
+Ctrl+C
+Ctrl+V</textarea>
+</div>
+
+<div class="panel">
+  <h2>⌨ 按键事件日志</h2>
+  <div id="log"></div>
+</div>
+
+<div class="panel">
+  <h2>🧪 测试步骤与预期结果</h2>
+  <table>
+    <tr><th>吞键模式</th><th>操作</th><th>本页面预期</th><th>截图软件预期</th></tr>
+    <tr><td>关闭</td><td>按 <code>Alt+Enter</code></td><td>日志出现 Enter 按下/抬起，<b style="color:var(--warn)">红色报警</b></td><td>正常触发截图</td></tr>
+    <tr><td>开启</td><td>按 <code>Alt+Enter</code></td><td>只看到 Alt 按下/抬起，<b>Enter 完全不出现</b>；不报警（除非勾了「修饰键单独按下也报警」）</td><td>正常触发截图</td></tr>
+    <tr><td>开启</td><td>正常打字</td><td>每个字母都出现在日志中，无报警</td><td>无动作</td></tr>
+  </table>
+  <div class="sub" style="margin-top:10px">
+    组合判定一律使用事件自带的修饰键标志（与真实考试平台一致），不再自己跟踪按键状态，
+    所以窗口失焦不会造成「Cmd+xxx」误标。吞键模式下，修饰键（Cmd/Alt）本身的按下/抬起
+    事件仍会到达页面（钩子只吞组合里的主键）；勾选「修饰键单独按下也报警」即可看到这个残留。
+    如果真实考试平台连单独按修饰键都报，需要把快捷键换成不带修饰键的键（如 F13 以上）。
+  </div>
+</div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id)
+  const log = $('log')
+  const banner = $('banner')
+  const alarmTimes = []           // 报警时间戳（频率检测）
+  const recentEvents = []         // 最近 5 秒事件时间戳
+  let alarmCount = 0
+  let keydownCount = 0
+  let eventCount = 0
+
+  const MOD_ALIAS = {
+    alt: 'Alt', option: 'Alt',
+    ctrl: 'Ctrl', control: 'Ctrl',
+    cmd: 'Cmd', meta: 'Cmd', command: 'Cmd', commandorcontrol: 'Cmd',
+    shift: 'Shift'
+  }
+
+  function parseBlacklist() {
+    return $('blacklist').value.split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const parts = line.split('+').map((p) => p.trim().toLowerCase())
+        const key = parts.pop()
+        return { mods: new Set(parts.map((p) => MOD_ALIAS[p] || p)), key }
+      })
+  }
+
+  // 组合一律用事件自带的修饰键标志判定（真实考试平台的做法），
+  // 不自己跟踪"按住了哪些键"——窗口失焦会错过抬起事件，跟踪会卡死
+  function comboFromEvent(e) {
+    const mods = new Set()
+    if (e.ctrlKey) mods.add('Ctrl')
+    if (e.altKey) mods.add('Alt')
+    if (e.shiftKey) mods.add('Shift')
+    if (e.metaKey) mods.add('Cmd')
+    return { mods, key: e.key.toLowerCase() }
+  }
+
+  function comboMatches(a, b) {
+    if (a.key !== b.key) return false
+    if (a.mods.size !== b.mods.size) return false
+    for (const m of a.mods) if (!b.mods.has(m)) return false
+    return true
+  }
+
+  const isModifierKey = (k) => ['Alt', 'Control', 'Meta', 'Shift'].includes(k)
+
+  function addLog(text, cls) {
+    const now = new Date()
+    const t = now.toTimeString().slice(0, 8) + '.' + String(now.getMilliseconds()).padStart(3, '0')
+    const div = document.createElement('div')
+    div.className = 'entry ' + cls
+    div.innerHTML = `<span class="t">${t}</span>  ${text}`
+    log.appendChild(div)
+    while (log.children.length > 400) log.removeChild(log.firstChild)
+    log.scrollTop = log.scrollHeight
+  }
+
+  function pushRecent() {
+    const now = Date.now()
+    recentEvents.push(now)
+    while (recentEvents.length && now - recentEvents[0] > 5000) recentEvents.shift()
+    $('sRecent').textContent = recentEvents.length
+    $('sLast').textContent = (now - (recentEvents[recentEvents.length - 1] || now)) + ' ms 前'
+  }
+
+  function fireAlarm(reason) {
+    alarmCount++
+    $('sAlarm').textContent = alarmCount
+    $('bannerCount').textContent = alarmCount + ' 次'
+    banner.classList.add('show')
+    addLog(`🚨 键盘异常：${reason}`, 'alarm')
+
+    // 频率检测：3 秒内 3 次
+    if ($('frequency').checked) {
+      const now = Date.now()
+      alarmTimes.push(now)
+      while (alarmTimes.length && now - alarmTimes[0] > 3000) alarmTimes.shift()
+      if (alarmTimes.length >= 3) {
+        addLog(`🚨 检测到短时间密集异常按键（${alarmTimes.length} 次 / 3 秒）`, 'alarm')
+        alarmTimes.length = 0
+      }
+    }
+  }
+
+  // 事件自带的修饰键标志（浏览器实际收到的）
+  const flagStr = (e) => `[M${e.metaKey ? 1 : 0}C${e.ctrlKey ? 1 : 0}A${e.altKey ? 1 : 0}S${e.shiftKey ? 1 : 0}]`
+
+  document.addEventListener('keydown', (e) => {
+    eventCount++
+    pushRecent()
+    $('sTotal').textContent = eventCount
+    if (e.repeat) {
+      addLog(`${e.key}（重复） code=${e.code} ${flagStr(e)}`, 'repeat')
+      return
+    }
+    keydownCount++
+    $('sKeydown').textContent = keydownCount
+
+    if (isModifierKey(e.key)) {
+      if ($('modifierAlone').checked) fireAlarm(`单独按下修饰键 ${e.key}`)
+      addLog(`⬇ ${e.key} code=${e.code} ${flagStr(e)}`, 'keydown')
+      return
+    }
+
+    const combo = comboFromEvent(e)
+    const comboStr = [...combo.mods, e.key].join('+') || e.key
+    const mode = $('mode').value
+
+    let matched = false
+    if (mode === 'strict' && (combo.mods.has('Alt') || combo.mods.has('Ctrl') || combo.mods.has('Cmd'))) {
+      matched = true
+    } else {
+      matched = parseBlacklist().some((b) => comboMatches(combo, b))
+    }
+
+    if (matched) {
+      fireAlarm(`检测到组合键 ${comboStr}`)
+      addLog(`⬇ ${comboStr} code=${e.code} ${flagStr(e)}`, 'combo')
+    } else {
+      addLog(`⬇ ${comboStr} code=${e.code} ${flagStr(e)}`, 'keydown')
+    }
+  }, true)
+
+  document.addEventListener('keyup', (e) => {
+    eventCount++
+    pushRecent()
+    $('sTotal').textContent = eventCount
+    if (isModifierKey(e.key)) {
+      addLog(`⬆ ${e.key} code=${e.code} ${flagStr(e)}`, 'keyup')
+    } else {
+      const combo = comboFromEvent(e)
+      const comboStr = [...combo.mods, e.key].join('+') || e.key
+      addLog(`⬆ ${comboStr} code=${e.code} ${flagStr(e)}`, 'keyup')
+    }
+  }, true)
+
+  window.addEventListener('focus', () => {
+    addLog(`👁 窗口获得焦点`, 'blur')
+  })
+  window.addEventListener('blur', () => {
+    addLog(`👁 窗口失焦`, 'blur')
+    if ($('blurWatch').checked) fireAlarm('检测到切换窗口（失焦）')
+  })
+
+  // 距上次事件计时器
+  setInterval(() => {
+    if (!recentEvents.length) { $('sLast').textContent = '—'; return }
+    $('sLast').textContent = Date.now() - recentEvents[recentEvents.length - 1] + ' ms 前'
+  }, 200)
+
+  // 顶部清空按钮
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      log.innerHTML = ''
+      alarmCount = 0
+      $('sAlarm').textContent = '0'
+      banner.classList.remove('show')
+      addLog('🗑 日志已清空', 'keyup')
+    }
+  }, true)
+})()
+</script>
+</body>
+</html>
