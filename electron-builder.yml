@@ -11,6 +11,9 @@ files:
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
 asarUnpack:
   - resources/**
+  # keyhook is a file: dependency (symlink), so its .node binary needs the
+  # wildcard form — a literal node_modules/keyhook/** pattern does not match it
+  - '**/*.node'
 win:
   executableName: 截屏解题助手
 nsis:

@@ -35,7 +35,29 @@ function isPersistedShortcutsState(value: unknown): value is PersistedShortcutsS
   return typeof value === 'object' && value !== null && 'shortcuts' in value
 }
 
+/**
+ * Exam-critical actions are bound to bare F1~F10 — a modifier-free shortcut is
+ * the only one a keyboard monitor cannot attribute to a suspicious combo, since
+ * macOS delivers modifier keydowns (Cmd/Alt/Ctrl/Shift) to apps through a path
+ * event taps cannot intercept. Everything else keeps a modifier-based default
+ * and remains reachable from the overlay toolbar / settings.
+ */
 const defaultShortcuts: Record<string, Omit<Shortcut, 'defaultKey'>> = {
+  takeScreenshot: { action: 'takeScreenshot', key: 'F8', category: 'Screenshot & AI' },
+  appendScreenshot: { action: 'appendScreenshot', key: 'F1', category: 'Screenshot & AI' },
+  stopSolutionStream: { action: 'stopSolutionStream', key: 'F2', category: 'Screenshot & AI' },
+  previousApiProfile: { action: 'previousApiProfile', key: 'F3', category: 'Screenshot & AI' },
+  nextApiProfile: { action: 'nextApiProfile', key: 'F4', category: 'Screenshot & AI' },
+  toggleTranscription: { action: 'toggleTranscription', key: 'F5', category: 'Screenshot & AI' },
+  increaseOpacity: { action: 'increaseOpacity', key: 'F6', category: 'Window Management' },
+  decreaseOpacity: { action: 'decreaseOpacity', key: 'F7', category: 'Window Management' },
+  pageUp: { action: 'pageUp', key: 'F9', category: 'Navigation' },
+  pageDown: { action: 'pageDown', key: 'F10', category: 'Navigation' },
+  clearTranscription: {
+    action: 'clearTranscription',
+    key: `${platformAlt}+Shift+T`,
+    category: 'Screenshot & AI'
+  },
   hideOrShowMainWindow: {
     action: 'hideOrShowMainWindow',
     key: `${platformAlt}+H`,
@@ -46,53 +68,6 @@ const defaultShortcuts: Record<string, Omit<Shortcut, 'defaultKey'>> = {
     key: `${platformAlt}+M`,
     category: 'Window Management'
   },
-  increaseOpacity: {
-    action: 'increaseOpacity',
-    key: `${platformAlt}+Shift+Up`,
-    category: 'Window Management'
-  },
-  decreaseOpacity: {
-    action: 'decreaseOpacity',
-    key: `${platformAlt}+Shift+Down`,
-    category: 'Window Management'
-  },
-  takeScreenshot: {
-    action: 'takeScreenshot',
-    key: `${platformAlt}+Enter`,
-    category: 'Screenshot & AI'
-  },
-  appendScreenshot: {
-    action: 'appendScreenshot',
-    key: `${platformAlt}+Shift+Enter`,
-    category: 'Screenshot & AI'
-  },
-  stopSolutionStream: {
-    action: 'stopSolutionStream',
-    key: `${platformAlt}+.`,
-    category: 'Screenshot & AI'
-  },
-  previousApiProfile: {
-    action: 'previousApiProfile',
-    key: `${platformAlt}+[`,
-    category: 'Screenshot & AI'
-  },
-  nextApiProfile: {
-    action: 'nextApiProfile',
-    key: `${platformAlt}+]`,
-    category: 'Screenshot & AI'
-  },
-  toggleTranscription: {
-    action: 'toggleTranscription',
-    key: `${platformAlt}+T`,
-    category: 'Screenshot & AI'
-  },
-  clearTranscription: {
-    action: 'clearTranscription',
-    key: `${platformAlt}+Shift+T`,
-    category: 'Screenshot & AI'
-  },
-  pageUp: { action: 'pageUp', key: 'CommandOrControl+J', category: 'Navigation' },
-  pageDown: { action: 'pageDown', key: 'CommandOrControl+K', category: 'Navigation' },
   moveMainWindowUp: {
     action: 'moveMainWindowUp',
     key: 'CommandOrControl+Up',
@@ -189,6 +164,11 @@ export const useShortcutsStore = create<ShortcutsStore>()(
         const shortcuts = { ...current.shortcuts }
         for (const [action, shortcut] of Object.entries(stored)) {
           if (shortcuts[action]) shortcuts[action] = shortcut
+        }
+        // Keep `defaultKey` pinned to the latest code default, so "reset to
+        // default" always restores the current scheme (e.g. the F-key bindings)
+        for (const [action, shortcut] of Object.entries(shortcuts)) {
+          if (current.shortcuts[action]) shortcut.defaultKey = current.shortcuts[action].key
         }
         // `switchApiProfile` was replaced by previous/nextApiProfile; drop it
         // so a stale binding cannot be recorded, nor linger in localStorage

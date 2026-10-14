@@ -52,6 +52,15 @@ const supportedPhysicalKeys = [
   'F10',
   'F11',
   'F12',
+  // F13~F20（需外接全尺寸键盘或 Karabiner 重映射；裸功能键可做无修饰快捷键）
+  'F13',
+  'F14',
+  'F15',
+  'F16',
+  'F17',
+  'F18',
+  'F19',
+  'F20',
   // Arrow keys
   'ArrowUp',
   'ArrowDown',
@@ -110,7 +119,10 @@ export function getShortcutAccelerator(event: KeyboardEvent) {
   if (isAltActive) modifiers.push('Alt')
   if (event.shiftKey) modifiers.push('Shift')
   if (event.metaKey) modifiers.push(isMac ? 'CommandOrControl' : 'Meta')
-  if (modifiers.length === 0) return null
+  // Function keys may be bound bare (no modifier) — a modifier-free shortcut is
+  // the only one a keyboard monitor cannot attribute to a suspicious combo.
+  // Every other key still requires a modifier to avoid accidental triggers.
+  if (modifiers.length === 0 && !keyCode.startsWith('F')) return null
 
   const specialKeysMap = {
     ArrowUp: 'Up',
