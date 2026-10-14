@@ -816,10 +816,13 @@ function restartKeyHook() {
     shortcut.registeredKeys = registeredKeys
     shortcut.status = registeredKeys.length ? ShortcutStatus.Registered : ShortcutStatus.Failed
   })
-  startKeyHook(combos, (index) => {
+  const hookStarted = startKeyHook(combos, (index) => {
     const action = actions[index]
     if (action) callbacks[action]?.()
   })
+  if (!hookStarted) {
+    console.error('[keyhook] event tap did not start; the swallow mode is not in effect')
+  }
 }
 
 /** Re-register every shortcut in whichever mode the settings currently ask for */

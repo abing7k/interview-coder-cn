@@ -11,14 +11,15 @@ module.exports = {
   available: !!addon,
   start(combos, callback) {
     if (!addon) return false
-    addon.start(combos, (index) => {
+    // Creating the event tap fails when the accessibility grant is missing or
+    // was revoked; that has to surface instead of being reported as success.
+    return !!addon.start(combos, (index) => {
       try {
         callback(index)
       } catch (err) {
         console.error('[keyhook] callback error:', err)
       }
     })
-    return true
   },
   stop() {
     if (addon) addon.stop()

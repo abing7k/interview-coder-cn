@@ -688,7 +688,9 @@ export default function SettingsPage() {
               <span className="text-xs">
                 {keyHookStatus.available
                   ? keyHookStatus.trusted
-                    ? '「辅助功能」权限已授权，按键拦截生效中'
+                    ? keyHookStatus.active
+                      ? '「辅助功能」权限已授权，按键拦截生效中'
+                      : '「辅助功能」权限已授权，但拦截未生效（可关掉吞键模式再开一次）'
                     : '未授权「辅助功能」权限，按键拦截不会生效'
                   : '原生拦截组件编译失败，吞键模式不可用（其余功能不受影响）'}
               </span>
